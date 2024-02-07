@@ -46,25 +46,30 @@ def Single_hour_optimization(Generators, Demands) :
     # Numbers of generators and demanding units
     n_gen = len(Generators)
     n_dem = len(Demands)
-    #Create the model
+    
+    #Optimization part
+    # Create the model
     model = gp.Model()
-    #Initialize the decision variables
+    # Initialize the decision variables
     var_gen = model.addVars(range(n_gen), vtype=GRB.CONTINUOUS, name='gen')
     var_dem = model.addVars(range(n_dem), vtype=GRB.CONTINUOUS, name='dem')
-    #Add constraints to the model
+    # Add constraints to the model
+    # Quantity supplied = Quantity used
     model.addConstr(gp.quicksum(var_dem[i] for i in range(n_dem)) - gp.quicksum(var_gen[i] for i in range(n_gen)) == 0)
+    # Quantities supplied can't be higher than maximum quantities
     for i in range(n_gen) :
         model.addConstr(var_gen[i] <= Generators['Capacity'][i])
+    # Quantities used can't be hihher than maximum demands
     for i in range(n_dem) :
         model.addConstr(var_dem[i] <= Demands['Load'][i])
     # Add the objective function to the model
     model.setObjective(gp.quicksum([Demands['Offer price'][i]*var_dem[i] for i in range(n_dem)])-gp.quicksum([Generators['Bid price'][i]*var_gen[i] for i in range(n_gen)]), GRB.MAXIMIZE)
-    #Solve the problem
+    # Solve the problem
     model.optimize()
     
-    # Get the optimal values
+    #Get the optimal values
     if model.status == GRB.OPTIMAL:
-        # Create a list to store the optimal values of the variables
+        # Create a list to store the optimal values of the variables ---> We can also decide to store them back in Generators and Demands ????
         optimal_gen = [var_gen[i].X for i in range(n_gen)]
         optimal_dem = [var_dem[i].X for i in range(n_dem)]
         # Value of the optimal objective
@@ -88,29 +93,39 @@ def Single_hour_optimization(Generators, Demands) :
 
 # Taking the optimization and giving the clearing price
 def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
-    # Go through the different suppliers to find the clearing price
+    #Go through the different suppliers to find the clearing price
+    # Condition for clearing and initialization
     clearing = False
     clearing_price = 0
     i = 0
     while (clearing == False) and (i <= len(Generators)) :
+        # For this producer, we take the quantity supplied and the maximum quantity
         max_cap = Generators['Capacity'][i]
         eff_cap = optimal_gen[i]
+        # If the quantity supplied is higher than 0 but lower than the max quantity, the clearing price is equal to the bid price of this producer
         if eff_cap > 0 and eff_cap < max_cap :
             clearing_price = Generators['Bid price'][i]
+            # Finish the loop
             clearing = True
+        # If the quantity supplied is equal to the maximum quantity and that we are not at the last producer
         elif eff_cap == max_cap and i!= len(Generators)-1 :
+            # Quantity supplied by the next producer
             next_eff_cap = optimal_gen[i+1]
+            # If this quantity is different than 0, then we will indent i and go to the next producer by starting again the loop, storing current max clearing price
             if next_eff_cap != 0 :
                 clearing_price = Generators['Bid price'][i]
                 i += 1
+            # If this quantity is equal to 0, that means that our bid price is in a range between the bid price of this producer and the bid price of the next one
             else :
                 next_bid_price = Generators['Bid price'][i+1]
                 clearing_price = [clearing_price, next_bid_price]
                 clearing = True
+        # If we arrive at the last producer without finishing the loop, then we have more demand and the clearing price is the bid price of the last producer
         else :
             clearing_price = Generators['Bid price'][i]
             clearing = True
-            
+    
+    # Print the clearing price and the quantity supplied
     print("\n")
     print(f"Clearing price : {clearing_price} $/MWh")
     print("Quantity provided : " + str(sum(optimal_dem)) + " MW")
@@ -132,23 +147,20 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
     y = Generators["Bid price"].values.tolist()
     # Width of each suppliers bars
     w = Generators["Capacity"].values.tolist()
-
+    # Plot the bar for the supply
     fig = plt.bar(xpos, 
             height = y,
             width = w,
             fill = True,
             color = colors,
             align = 'edge')
-
-    plt.xlim(0, max(Generators["Capacity"].sum(),Demands["Load"].sum()+5))
-    plt.ylim(0, max(Generators["Bid price"].max(),Demands["Offer price"].max()) + 15)
-    
+    # Legend with name of suppliers
     plt.legend(fig.patches, Generators["Name"].values.tolist(),
               loc = "best",
               ncol = 3)
     
     
-    # Demands
+    # Demands plotting
     max_demand = sum(Demands["Load"].values.tolist())
     xpos = 0
     for i in range(len(Demands)) :
@@ -172,14 +184,19 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                 linestyle = "dashed",
                 label = "Demand")
     
+    # Small text for the clearing price and the quantity supplied
     if type(clearing_price) == list :
         plt.text(x = sum(optimal_gen) - 10,
                 y = clearing_price[-1] + 10,
-                s = f"Electricity price: \n    {clearing_price} $/MWh \n Quantity : " + str(sum(optimal_dem)) + " MW")
+                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(sum(optimal_dem)) + " MW")
     else :
         plt.text(x = sum(optimal_gen) - 10,
                 y = clearing_price + 10,
-                s = f"Electricity price: \n    {clearing_price} $/MWh \n Quantity : " + str(sum(optimal_dem)) + "MW")
+                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(sum(optimal_dem)) + "MW")
+    
+    # Limit of the figure
+    plt.xlim(0, max(Generators["Capacity"].sum(),Demands["Load"].sum()+5))
+    plt.ylim(0, max(Generators["Bid price"].max(),Demands["Offer price"].max()) + 15)
 
     plt.xlabel("Power plant capacity (MW)")
     plt.ylabel("Bid price ($/MWh)")

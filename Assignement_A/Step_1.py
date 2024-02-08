@@ -56,12 +56,14 @@ def Single_hour_optimization(Generators, Demands) :
     # Add constraints to the model
     # Quantity supplied = Quantity used
     model.addConstr(gp.quicksum(var_dem[i] for i in range(n_dem)) - gp.quicksum(var_gen[i] for i in range(n_gen)) == 0)
-    # Quantities supplied can't be higher than maximum quantities
+    # Quantities supplied can't be higher than maximum quantities and can't be negative
     for i in range(n_gen) :
         model.addConstr(var_gen[i] <= Generators['Capacity'][i])
-    # Quantities used can't be hihher than maximum demands
+        model.addConstr(var_gen[i] >= 0)
+    # Quantities used can't be higher than maximum demands and can't be negative
     for i in range(n_dem) :
         model.addConstr(var_dem[i] <= Demands['Load'][i])
+        model.addConstr(var_dem[i] >= 0)
     # Add the objective function to the model
     model.setObjective(gp.quicksum([Demands['Offer price'][i]*var_dem[i] for i in range(n_dem)])-gp.quicksum([Generators['Bid price'][i]*var_gen[i] for i in range(n_gen)]), GRB.MAXIMIZE)
     # Solve the problem
@@ -130,6 +132,28 @@ def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
     print(f"Clearing price : {clearing_price} $/MWh")
     print("Quantity provided : " + str(sum(optimal_dem)) + " MW")
     return(clearing_price)
+
+
+# Calculating social welfare, profits of suppliers and utility of demands
+def Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price) :
+    Social_welfare = optimal_obj
+    Profits_of_suppliers = []
+    Utility_of_demands = []
+    for i, value in enumerate(optimal_gen): 
+        Profits_of_suppliers.append([Generators['Name'][i],(clearing_price - Generators['Bid price'][i])*value])
+    for i, value in enumerate(optimal_dem): 
+        Utility_of_demands.append([Demands['Name'][i],(Demands['Offer price'][i] - clearing_price)*value])
+    print("\n")
+    print(f"Social welfare : {Social_welfare} $")
+    print("\n")
+    print("Profits of suppliers :")
+    for item in Profits_of_suppliers:
+        print(item[0] + f" : {item[1]} $")
+    print("\n")
+    print("Utility of demands :")
+    for item in Utility_of_demands:
+        print(item[0] + f" : {item[1]} $")
+    return(Social_welfare, Profits_of_suppliers, Utility_of_demands)
 
 
 # Plotting the solution of the clearing for an hour and demands and generators entries
@@ -212,6 +236,8 @@ def Copper_plate_single_hour(Generators, Demands) :
     optimal_obj, optimal_gen, optimal_dem = Single_hour_optimization(Generators, Demands)
     # Clearing the price
     clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
+    # Calculating commodities
+    Social_welfare, Profits_of_suppliers, Utility_of_demands = Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price)
     # Plotting the results
     Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem)
     

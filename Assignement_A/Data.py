@@ -1,0 +1,107 @@
+""" Code for importing the relevant data """
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+""" Variables used in this file """
+
+# Informations on generating units are in the dataframe 'Generators' with the columns names :
+    # 'Name' for the name of the generator
+    # 'Node' for the number of the node
+    # 'Capacity' for the maximum capacity of the generator
+    # 'Ramp up' for the ramp up limit of the generator
+    # 'Ramp down' for the ramp down limit of the generator
+    # 'Bid price' for the bid price of the generator
+    
+# Informations on wind farms units are in the dataframe 'Wind_Farms' with the columns names :
+    # 'Name' for the name of the wind farm
+    # 'Node' for the number of the node
+    # 'Capacity' for the maximum capacity of the wind farm
+    # 'Bid price' for the bid price of the wind farm
+    
+# Informations on demanding units are in the dataframe 'Demands' with the columns names :
+    # 'Name' for the name of the demand
+    # 'Node' for the number of the node
+    # 'Load' for the load of the demand
+    # 'Offer price' for the offer price of the demand
+    
+    
+""" Import values of the generators units """
+
+Generators = pd.DataFrame([
+    ['Generator 1', 1, 152, 120, 120, 13.32],
+    ['Generator 2', 2, 152, 120, 120, 13.32],
+    ['Generator 3', 7, 350, 350, 350, 20.7],
+    ['Generator 4', 13, 591, 240, 240, 20.93],
+    ['Generator 5', 15, 60, 60, 60, 26.11],
+    ['Generator 6', 15, 155, 155, 155, 10.52],
+    ['Generator 7', 16, 155, 155, 155, 10.52],
+    ['Generator 8', 18, 400, 280, 280, 6.02],
+    ['Generator 9', 21, 400, 280, 280, 5.47],
+    ['Generator 10', 22, 300, 300, 300, 0],
+    ['Generator 11', 23, 310, 180, 180, 10.52],
+    ['Generator 12', 23, 350, 240, 240, 10.89]],
+    columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Bid price'])
+
+
+""" Import values of the demand units """
+
+Load_profile = pd.DataFrame([
+    [1, 1775.835], [2, 1669.815], [3, 1590.3],
+    [4, 1563.795], [5, 1563.795], [6, 1590.3],
+    [7, 1961.37], [8, 2279.43], [9, 2517.975],
+    [10, 2544.48], [11, 2544.48], [12, 2517.975],
+    [13, 2517.975], [14, 2517.975], [15, 2464.965],
+    [16, 2464.965], [17, 2623.995], [18, 2650.5],
+    [19, 2650.5], [20, 2544.48], [21, 2411.955],
+    [22, 2199.915], [23, 1934.865], [24, 1669.815]],
+    columns=['Hour', 'Load'])
+
+Load_distribution = pd.DataFrame([
+    ['Demand 1', 1, 0.038], ['Demand 2', 2, 0.034],
+    ['Demand 3', 3, 0.063], ['Demand 4', 4, 0.026],
+    ['Demand 5', 5, 0.025], ['Demand 6', 6, 0.048],
+    ['Demand 7', 7, 0.044], ['Demand 8', 8, 0.06],
+    ['Demand 9', 9, 0.061], ['Demand 10', 10, 0.068],
+    ['Demand 11', 13, 0.093], ['Demand 12', 14, 0.068],
+    ['Demand 13', 15, 0.111], ['Demand 14', 16, 0.035],
+    ['Demand 15', 18, 0.117], ['Demand 16', 19, 0.064],
+    ['Demand 17', 20, 0.045]],
+    columns=['Name', 'Node', 'Percentage'])
+
+max_bid_price = Generators['Bid price'].max()
+nb_demand = len(Load_distribution)
+nb_hour = len(Load_profile)
+offer_price_step = round(max_bid_price*0.5/nb_demand,2)
+
+demands = []
+for i in range(nb_demand):
+    demands.append([Load_distribution['Name'][i], Load_distribution['Node'][i],
+                    [round(Load_distribution['Percentage'][i]*Load_profile['Load'][j],2) for j in range(nb_hour)],
+                    [round(max_bid_price*1.5-offer_price_step*i,2) for j in range(nb_hour)]])
+
+Demands = pd.DataFrame(demands,
+                       columns=['Name', 'Node', 'Load', 'Offer price'])
+
+
+""" Import values of the wind farms units """
+
+# I took zone 1,2,3,7,8,9
+Wind_Farms = pd.DataFrame([
+    ['Wind farm 1', 3, [105.8518942, 118.5416375, 136.0025846, 147.6747565, 153.3498415, 154.7855366, 155.7408754, 157.2236407, 155.5708732, 154.2616933, 149.8631035, 140.6540638, 134.4390929, 130.4065771, 127.3607862, 129.230793, 127.0150452, 127.1557626, 131.630263, 134.4943655, 136.0450335, 140.6879798, 136.6616767, 137.9242212], [0]*nb_hour],
+    ['Wind farm 2', 5, [132.0365009, 139.6351285, 142.6908722, 145.885015, 145.6857226, 146.0575584, 146.0833968, 145.2777323, 143.4593029, 144.0384271, 145.5188664, 144.6885944, 141.2975305, 140.8724154, 143.5424666, 142.9933626, 143.3615159, 141.7135793, 143.2837817, 144.0653615, 145.9442153, 147.8793794, 141.532961, 136.3428801], [0]*nb_hour],
+    ['Wind farm 3', 7, [121.7655941, 135.5020455, 144.338065, 148.9438578, 150.9452044, 150.2716884, 152.5396741, 151.9984083, 148.4043069, 149.2154754, 148.7762769, 147.7897076, 145.3573624, 142.1846647, 142.7763901, 143.7663529, 142.711523, 141.6913861, 142.5436727, 146.7421655, 147.5593436, 153.3961561, 147.9233616, 141.5863522], [0]*nb_hour],
+    ['Wind farm 4', 16, [96.22143521, 110.375753, 125.4343489, 134.7639093, 137.833016, 139.2377607, 142.3293848, 139.4687097, 135.7889317, 135.2141593, 137.057534, 138.5010498, 136.0619849, 133.0730888, 133.7750521, 133.5091541, 128.9947943, 127.3198906, 132.3990695, 140.0305324, 141.455082, 141.9415908, 136.4852693, 127.4651946], [0]*nb_hour],
+    ['Wind farm 5', 21, [89.37566837, 102.7333585, 114.6163661, 125.4500056, 127.2155529, 129.2787442, 133.1578469, 133.6247378, 130.8260382, 130.8722442, 131.071553, 129.5253217, 128.3853801, 128.0208993, 128.8564491, 131.1777688, 130.8831642, 129.4530387, 135.3147408, 141.0256722, 141.0290586, 138.9928173, 134.7478994, 130.120545], [0]*nb_hour],
+    ['Wind farm 6', 23, [67.81164861, 72.65732623, 77.33228393, 81.72946758, 81.60447568, 81.68703202, 82.84271004, 82.24553017, 80.32702269, 81.26731038, 81.52175236, 80.33102453, 80.37375837, 79.47286975, 80.7187049, 82.34650655, 83.23783329, 83.18344086, 85.83028167, 86.0307012, 85.40761746, 84.38889089, 82.34007379, 80.89224889], [0]*nb_hour]],
+    columns=['Name', 'Node', 'Capacity', 'Bid price'])
+
+
+
+
+
+
+
+
+

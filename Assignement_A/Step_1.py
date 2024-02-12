@@ -1,5 +1,6 @@
 """ Code for the copper-plate system with one hour """
 
+from Data import Generators, Demands, Wind_Farms
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -20,21 +21,35 @@ GRB = gp.GRB
     # 'Offer price' for the offer price of the demand
     
     
-""" Fake Variables defined just for trying the problem """
+""" Fake Variables version defined just for trying the problem """
 
-Generators = pd.DataFrame([
-    ['Gas 1',40,80],['Gas 2',25,85],
-    ['Coal 1',30,70],['Coal 2',30,65],
-    ['Biomass',20,40],['Nuclear',80,20],
-    ['Wind 1',20,0],['Wind 2',5,0]],
-    columns=['Name','Capacity','Bid price'])
+# Generators = pd.DataFrame([
+#     ['Gas 1',40,80],['Gas 2',25,85],
+#     ['Coal 1',30,70],['Coal 2',30,65],
+#     ['Biomass',20,40],['Nuclear',80,20],
+#     ['Wind 1',20,0],['Wind 2',5,0]],
+#     columns=['Name','Capacity','Bid price'])
+
+# Demands = pd.DataFrame([
+#     ['Houses',120,120],['Industry 1',50,100],
+#     ['Industry 2',15,80]],
+#     columns=['Name','Load','Offer price'])
+
+""" With real variable, select one hour """
+
+# Select only one hour
+hour = 10
+for i in range(len(Demands)) :
+    Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
+    Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
+
+# Adding the wind farms
+for i in range(len(Wind_Farms)) :
+    Wind_Farms.loc[i, 'Capacity'] = round(Wind_Farms['Capacity'][i][hour-1],2)
+    Wind_Farms.loc[i, 'Bid price'] = Wind_Farms['Bid price'][i][hour-1]
+Generators = pd.concat([Generators, Wind_Farms], axis=0)
 # Order in ascending orders of bid price for easier treatment
 Generators = Generators.sort_values(by='Bid price').reset_index(drop=True)
-
-Demands = pd.DataFrame([
-    ['Houses',120,120],['Industry 1',50,100],
-    ['Industry 2',20,80]],
-    columns=['Name','Load','Offer price'])
 # Order in descending orders of offer price for easier treatment
 Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
 
@@ -43,6 +58,8 @@ Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(dro
         
 # Taking the hour supply and load information and optimizing (see lecture 2)
 def Single_hour_optimization(Generators, Demands) :
+    # Global variables
+    global optimal_gen, optimal_dem
     # Numbers of generators and demanding units
     n_gen = len(Generators)
     n_dem = len(Demands)
@@ -56,14 +73,12 @@ def Single_hour_optimization(Generators, Demands) :
     # Add constraints to the model
     # Quantity supplied = Quantity used
     model.addConstr(gp.quicksum(var_dem[i] for i in range(n_dem)) - gp.quicksum(var_gen[i] for i in range(n_gen)) == 0)
-    # Quantities supplied can't be higher than maximum quantities and can't be negative
+    # Quantities supplied can't be higher than maximum quantities
     for i in range(n_gen) :
         model.addConstr(var_gen[i] <= Generators['Capacity'][i])
-        model.addConstr(var_gen[i] >= 0)
-    # Quantities used can't be higher than maximum demands and can't be negative
+    # Quantities used can't be hihher than maximum demands
     for i in range(n_dem) :
         model.addConstr(var_dem[i] <= Demands['Load'][i])
-        model.addConstr(var_dem[i] >= 0)
     # Add the objective function to the model
     model.setObjective(gp.quicksum([Demands['Offer price'][i]*var_dem[i] for i in range(n_dem)])-gp.quicksum([Generators['Bid price'][i]*var_gen[i] for i in range(n_gen)]), GRB.MAXIMIZE)
     # Solve the problem
@@ -81,11 +96,11 @@ def Single_hour_optimization(Generators, Demands) :
         print("\n")
         print("Power generation :")
         for i, value in enumerate(optimal_gen):
-            print(Generators["Name"][i] + f" : {value}")
+            print(Generators["Name"][i] + f" : {round(value,2)} MW")
         print("\n")
         print("Demand provided :")
         for i, value in enumerate(optimal_dem):
-            print(Demands["Name"][i] + f" : {value}")
+            print(Demands["Name"][i] + f" : {round(value,2)} MW")
     else:
         print("Optimization did not converge to an optimal solution.")
         
@@ -130,30 +145,8 @@ def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
     # Print the clearing price and the quantity supplied
     print("\n")
     print(f"Clearing price : {clearing_price} $/MWh")
-    print("Quantity provided : " + str(sum(optimal_dem)) + " MW")
+    print("Quantity provided : " + str(round(sum(optimal_dem),2)) + " MW")
     return(clearing_price)
-
-
-# Calculating social welfare, profits of suppliers and utility of demands
-def Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price) :
-    Social_welfare = optimal_obj
-    Profits_of_suppliers = []
-    Utility_of_demands = []
-    for i, value in enumerate(optimal_gen): 
-        Profits_of_suppliers.append([Generators['Name'][i],(clearing_price - Generators['Bid price'][i])*value])
-    for i, value in enumerate(optimal_dem): 
-        Utility_of_demands.append([Demands['Name'][i],(Demands['Offer price'][i] - clearing_price)*value])
-    print("\n")
-    print(f"Social welfare : {Social_welfare} $")
-    print("\n")
-    print("Profits of suppliers :")
-    for item in Profits_of_suppliers:
-        print(item[0] + f" : {item[1]} $")
-    print("\n")
-    print("Utility of demands :")
-    for item in Utility_of_demands:
-        print(item[0] + f" : {item[1]} $")
-    return(Social_welfare, Profits_of_suppliers, Utility_of_demands)
 
 
 # Plotting the solution of the clearing for an hour and demands and generators entries
@@ -212,11 +205,11 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
     if type(clearing_price) == list :
         plt.text(x = sum(optimal_gen) - 10,
                 y = clearing_price[-1] + 10,
-                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(sum(optimal_dem)) + " MW")
+                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
     else :
         plt.text(x = sum(optimal_gen) - 10,
                 y = clearing_price + 10,
-                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(sum(optimal_dem)) + "MW")
+                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
     
     # Limit of the figure
     plt.xlim(0, max(Generators["Capacity"].sum(),Demands["Load"].sum()+5))
@@ -236,8 +229,6 @@ def Copper_plate_single_hour(Generators, Demands) :
     optimal_obj, optimal_gen, optimal_dem = Single_hour_optimization(Generators, Demands)
     # Clearing the price
     clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
-    # Calculating commodities
-    Social_welfare, Profits_of_suppliers, Utility_of_demands = Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price)
     # Plotting the results
     Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem)
     

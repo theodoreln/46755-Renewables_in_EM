@@ -30,19 +30,19 @@ import pandas as pd
 """ Import values of the generators units """
 
 Generators = pd.DataFrame([
-    ['Generator 1', 1, 152, 120, 120, 13.32],
-    ['Generator 2', 2, 152, 120, 120, 13.32],
-    ['Generator 3', 7, 350, 350, 350, 20.7],
-    ['Generator 4', 13, 591, 240, 240, 20.93],
-    ['Generator 5', 15, 60, 60, 60, 26.11],
-    ['Generator 6', 15, 155, 155, 155, 10.52],
-    ['Generator 7', 16, 155, 155, 155, 10.52],
-    ['Generator 8', 18, 400, 280, 280, 6.02],
-    ['Generator 9', 21, 400, 280, 280, 5.47],
-    ['Generator 10', 22, 300, 300, 300, 0],
-    ['Generator 11', 23, 310, 180, 180, 10.52],
-    ['Generator 12', 23, 350, 240, 240, 10.89]],
-    columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Bid price'])
+    ['Generator 1', 1, 152, 120, 120, 76, 13.32],
+    ['Generator 2', 2, 152, 120, 120, 76, 13.32],
+    ['Generator 3', 7, 350, 350, 350, 0, 20.7],
+    ['Generator 4', 13, 591, 240, 240, 0, 20.93],
+    ['Generator 5', 15, 60, 60, 60, 0, 26.11],
+    ['Generator 6', 15, 155, 155, 155, 0, 10.52],
+    ['Generator 7', 16, 155, 155, 155, 124, 10.52],
+    ['Generator 8', 18, 400, 280, 280, 240, 6.02],
+    ['Generator 9', 21, 400, 280, 280, 240, 5.47],
+    ['Generator 10', 22, 300, 300, 300, 240, 0],
+    ['Generator 11', 23, 310, 180, 180, 248, 10.52],
+    ['Generator 12', 23, 350, 240, 240, 280, 10.89]],
+    columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Initial power', 'Bid price'])
 
 
 """ Import values of the demand units """

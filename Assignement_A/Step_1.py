@@ -6,10 +6,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import gurobipy as gp
+import os
 GRB = gp.GRB
 
 
+##################################
 """ Variables used in the file """
+##################################
+
 # Informations on generating units are in the dataframe 'Generators' with the columns names :
     # 'Name' for the name of the generator
     # 'Capacity' for the capacity of the generator
@@ -20,8 +24,10 @@ GRB = gp.GRB
     # 'Load' for the load of the demand
     # 'Offer price' for the offer price of the demand
     
-    
+ 
+##################################################################
 """ Fake Variables version defined just for trying the problem """
+##################################################################
 
 # Generators = pd.DataFrame([
 #     ['Gas 1',40,80],['Gas 2',25,85],
@@ -35,26 +41,32 @@ GRB = gp.GRB
 #     ['Industry 2',15,80]],
 #     columns=['Name','Load','Offer price'])
 
+
+###########################################
 """ With real variable, select one hour """
+###########################################
 
-# Select only one hour
-hour = 10
-for i in range(len(Demands)) :
-    Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
-    Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
+if __name__ == "__main__":
+    # Select only one hour
+    hour = 10
+    for i in range(len(Demands)) :
+        Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
+        Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
+    
+    # Adding the wind farms
+    for i in range(len(Wind_Farms)) :
+        Wind_Farms.loc[i, 'Capacity'] = round(Wind_Farms['Capacity'][i][hour-1],2)
+        Wind_Farms.loc[i, 'Bid price'] = Wind_Farms['Bid price'][i][hour-1]
+    Generators = pd.concat([Generators, Wind_Farms], axis=0)
+    # Order in ascending orders of bid price for easier treatment
+    Generators = Generators.sort_values(by=['Bid price','Name'], ascending=[True, 'Wind farm' in Generators['Name'].values]).reset_index(drop=True)
+    # Order in descending orders of offer price for easier treatment
+    Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
 
-# Adding the wind farms
-for i in range(len(Wind_Farms)) :
-    Wind_Farms.loc[i, 'Capacity'] = round(Wind_Farms['Capacity'][i][hour-1],2)
-    Wind_Farms.loc[i, 'Bid price'] = Wind_Farms['Bid price'][i][hour-1]
-Generators = pd.concat([Generators, Wind_Farms], axis=0)
-# Order in ascending orders of bid price for easier treatment
-Generators = Generators.sort_values(by='Bid price').reset_index(drop=True)
-# Order in descending orders of offer price for easier treatment
-Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
 
-
+###############################################
 """ Function useful for clearing the market """
+###############################################
         
 # Taking the hour supply and load information and optimizing (see lecture 2)
 def Single_hour_optimization(Generators, Demands) :
@@ -152,31 +164,106 @@ def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
 
 
 # Plotting the solution of the clearing for an hour and demands and generators entries
-def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem) :
+def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem, Title) :
     # Size of the figure
     plt.figure(figsize = (20, 12))
     plt.rcParams["font.size"] = 16
     
+    # Positions of the generation units bars
+    xpos_wf, y_wf, w_wf = [],[],[]
+    xpos_conv, y_conv, w_conv = [],[],[]
+    xpos_constr, y_constr, w_constr = [],[],[]
+    xpos_not, y_not, w_not = [],[],[]
+    xpos = 0
+    x_not_select = -1
+    price_last_selected = 0
+    for i in range(len(Generators)) :
+        if 'Wind farm' in Generators['Name'][i] :
+            xpos_wf.append(xpos)
+            y_wf.append(Generators['Bid price'][i])
+            w_wf.append(optimal_gen[i])
+            xpos += optimal_gen[i]
+        else :
+            if optimal_gen[i] == 0 :
+                xpos_not.append(xpos)
+                y_not.append(Generators['Bid price'][i])
+                w_not.append(Generators['Capacity'][i])
+                if x_not_select == -1 :
+                    x_not_select = xpos
+                    price_last_selected = Generators['Bid price'][i-1]
+                xpos += Generators['Capacity'][i]
+            else :
+                if x_not_select == -1 :
+                    xpos_conv.append(xpos)
+                    y_conv.append(Generators['Bid price'][i])
+                    w_conv.append(optimal_gen[i])
+                    if optimal_gen[i] == Generators['Capacity'][i] :
+                        xpos += optimal_gen[i]
+                    else :
+                        xpos_not.append(xpos+optimal_gen[i])
+                        y_not.append(Generators['Bid price'][i])
+                        w_not.append(Generators['Capacity'][i] - optimal_gen[i])
+                        x_not_select = xpos + optimal_gen[i]
+                        xpos += Generators['Capacity'][i]
+                        price_last_selected = Generators['Bid price'][i]
+                elif x_not_select != -1 and price_last_selected == Generators['Bid price'][i] :
+                    xpos_conv.append(x_not_select)
+                    y_conv.append(Generators['Bid price'][i])
+                    w_conv.append(optimal_gen[i])
+                    for j in range(len(xpos_not)) :
+                        xpos_not[j] += optimal_gen[i]
+                    x_not_select += optimal_gen[i]
+                    xpos += optimal_gen[i]
+                    if optimal_gen[i] != Generators['Capacity'][i] :
+                        xpos_not.append(xpos)
+                        y_not.append(Generators['Bid price'][i])
+                        w_not.append(Generators['Capacity'][i] - optimal_gen[i])
+                        xpos += Generators['Capacity'][i] - optimal_gen[i]
+                else :
+                    xpos_constr.append(x_not_select)
+                    y_constr.append(Generators['Bid price'][i])
+                    w_constr.append(optimal_gen[i])
+                    for j in range(len(xpos_not)) :
+                        xpos_not[j] += optimal_gen[i]
+                    x_not_select += optimal_gen[i]
+                    xpos += optimal_gen[i]
+                    if optimal_gen[i] != Generators['Capacity'][i] :
+                        xpos_not.append(xpos)
+                        y_not.append(Generators['Bid price'][i])
+                        w_not.append(Generators['Capacity'][i] - optimal_gen[i])
+                        xpos += Generators['Capacity'][i] - optimal_gen[i]
+                        
     # Different colors for each suppliers
-    colors = sns.color_palette('flare', len(Generators))
-    # Positions of the suppliers bars
-    xpos = [0]
-    for i in range(1,len(Generators)) :
-        xpos.append(Generators["Capacity"][i-1] + xpos[i-1])
-    y = Generators["Bid price"].values.tolist()
-    # Width of each suppliers bars
-    w = Generators["Capacity"].values.tolist()
+    colors = sns.color_palette('flare', len(xpos_conv))
     # Plot the bar for the supply
-    fig = plt.bar(xpos, 
-            height = y,
-            width = w,
+    fig = plt.bar(xpos_wf, 
+            height = y_wf,
+            width = w_wf,
+            fill = True,
+            color = "green",
+            align = 'edge')
+    fig = plt.bar(xpos_conv, 
+            height = y_conv,
+            width = w_conv,
             fill = True,
             color = colors,
             align = 'edge')
+    fig = plt.bar(xpos_constr, 
+            height = y_constr,
+            width = w_constr,
+            fill = True,
+            color = "red",
+            align = 'edge')
+    fig = plt.bar(xpos_not, 
+            height = y_not,
+            width = w_not,
+            fill = False,
+            color = "blue",
+            align = 'edge')
     # Legend with name of suppliers
-    plt.legend(fig.patches, Generators["Name"].values.tolist(),
-              loc = "best",
-              ncol = 3)
+    # plt.legend(fig.patches, Generators["Name"].values.tolist(),
+    #           loc = "best",
+    #           ncol = 3)
     
     
     # Demands plotting
@@ -204,22 +291,26 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                 label = "Demand")
     
     # Small text for the clearing price and the quantity supplied
-    if type(clearing_price) == list :
-        plt.text(x = sum(optimal_gen) - 10,
-                y = clearing_price[-1] + 10,
-                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
-    else :
-        plt.text(x = sum(optimal_gen) - 10,
-                y = clearing_price + 10,
-                s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
+    # if type(clearing_price) == list :
+    #     plt.text(x = sum(optimal_gen) - 10,
+    #             y = clearing_price[-1] + 10,
+    #             s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
+    # else :
+    #     plt.text(x = sum(optimal_gen) - 10,
+    #             y = clearing_price + 10,
+    #             s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
     
     # Limit of the figure
     plt.xlim(0, max(Generators["Capacity"].sum(),Demands["Load"].sum()+5))
-    plt.ylim(0, max(Generators["Bid price"].max(),Demands["Offer price"].max()) + 15)
+    plt.ylim(0, max(Generators["Bid price"].max(),Demands["Offer price"].max()) + 10)
 
     plt.xlabel("Power plant capacity (MW)")
     plt.ylabel("Bid price ($/MWh)")
-    plt.title("Market clearing for the copper plate single hour")
+    plt.title(Title)
+    output_folder = os.path.join(os.getcwd(), 'plots')
+    pdf_name = Title+'.pdf'
+    pdf_filename = os.path.join(output_folder, pdf_name)
+    plt.savefig(pdf_filename)
     plt.show()
     
     
@@ -245,8 +336,9 @@ def Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clea
     return(Social_welfare, Profits_of_suppliers, Utility_of_demands)
 
 
-
+#######################
 """ Global function """
+#######################
 
 def Copper_plate_single_hour(Generators, Demands) :
     # Solving the optimization problem
@@ -258,7 +350,7 @@ def Copper_plate_single_hour(Generators, Demands) :
     # Plotting the results
     Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem)
     
-Copper_plate_single_hour(Generators, Demands)
+# Copper_plate_single_hour(Generators, Demands)
 
 
 

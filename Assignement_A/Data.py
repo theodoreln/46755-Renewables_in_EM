@@ -4,7 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+
+###################################
 """ Variables used in this file """
+###################################
 
 # Informations on generating units are in the dataframe 'Generators' with the columns names :
     # 'Name' for the name of the generator
@@ -26,8 +29,10 @@ import pandas as pd
     # 'Load' for the load of the demand
     # 'Offer price' for the offer price of the demand
     
-    
+  
+#############################################
 """ Import values of the generators units """
+#############################################
 
 Generators = pd.DataFrame([
     ['Generator 1', 1, 152, 120, 120, 76, 13.32],
@@ -45,7 +50,9 @@ Generators = pd.DataFrame([
     columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Initial power', 'Bid price'])
 
 
+#########################################
 """ Import values of the demand units """
+#########################################
 
 Load_profile = pd.DataFrame([
     [1, 1775.835], [2, 1669.815], [3, 1590.3],
@@ -85,7 +92,9 @@ Demands = pd.DataFrame(demands,
                        columns=['Name', 'Node', 'Load', 'Offer price'])
 
 
+#############################################
 """ Import values of the wind farms units """
+#############################################
 
 # I took zone 1,2,3,7,8,9
 Wind_Farms = pd.DataFrame([

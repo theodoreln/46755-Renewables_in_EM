@@ -139,6 +139,12 @@ def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen
     optimal_dem_hour = Demands_hour['Optimal'].to_list()
     return(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
 
+# Trying for only one hour    
+# optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
+# Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, 1)
+# Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
+# Single_hour_plot(Supply_hour, Demands_hour, 30, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
+
 
 #######################
 """ Global function """
@@ -146,17 +152,39 @@ def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen
 
 def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
+    Electrolizer_1 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
+    Electrolizer_2 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
+    Demand_total = pd.DataFrame(columns=['Hour', 'Demand'])
     for i in range(1,25) :
         Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, i)
         Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
         Single_hour_plot(Supply_hour, Demands_hour, 30, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(i))
         
-Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
+        # Add a new row to the dataframe
+        Electrolizer_1.loc[len(Electrolizer_1.index)] = [i, Wind_Farms_hour['Capacity'][index_elec[0]], optimal_elec_hour[0], Wind_Farms_hour['Optimal'][index_elec[0]]]  
+        Electrolizer_2.loc[len(Electrolizer_2.index)] = [i, Wind_Farms_hour['Capacity'][index_elec[1]], optimal_elec_hour[1], Wind_Farms_hour['Optimal'][index_elec[1]]]  
+        Demand_total.loc[len(Demand_total.index)] = [i, Demands_hour['Optimal'].sum()]
+        
+    return(Electrolizer_1, Electrolizer_2, Demand_total)
+        
+Electrolizer_1, Electrolizer_2, Demand_total = Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
+
+
+#######################
+""" For Leonie """
+#######################
+
+# You can launch this file and will have two dataframe Electrolizer_1 adnd Electrolizer_2 with different columns :
+    # 'Hour' with the hour of the day
+    # 'Wind farm capacity' with the total wind electrical capacity
+    # 'Electrolyzer capacity' the capacity the electrolyzer is consuming at that time
+    # 'Grid provided capacity' the power sent to the grid at that hour
+
+# You can find the total demand per hour in the Dataframe Demand_total with columns :
+    # 'Hour' with the hour of the day
+    # 'Demand' with the total demand at that hour
     
-
-
-
-
+    
 
 
 

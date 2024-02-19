@@ -48,7 +48,7 @@ GRB = gp.GRB
 
 if __name__ == "__main__":
     # Select only one hour
-    hour = 10
+    hour = 1
     for i in range(len(Demands)) :
         Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
         Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
@@ -58,9 +58,9 @@ if __name__ == "__main__":
         Wind_Farms.loc[i, 'Capacity'] = round(Wind_Farms['Capacity'][i][hour-1],2)
         Wind_Farms.loc[i, 'Bid price'] = Wind_Farms['Bid price'][i][hour-1]
     Generators = pd.concat([Generators, Wind_Farms], axis=0)
-    # Order in ascending orders of bid price for easier treatment
+    # Order in ascending orders, necessary for the optimization 
     Generators = Generators.sort_values(by=['Bid price','Name'], ascending=[True, 'Wind farm' in Generators['Name'].values]).reset_index(drop=True)
-    # Order in descending orders of offer price for easier treatment
+    # Order in descending orders, necessary for the optimization
     Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
 
 
@@ -232,39 +232,43 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                         y_not.append(Generators['Bid price'][i])
                         w_not.append(Generators['Capacity'][i] - optimal_gen[i])
                         xpos += Generators['Capacity'][i] - optimal_gen[i]
-                        
     # Different colors for each suppliers
-    colors = sns.color_palette('flare', len(xpos_conv))
+    colors = sns.color_palette('flare', len(xpos_wf)+len(xpos_conv))
+    col_wf = colors[:len(xpos_wf)]
+    col_conv = colors[len(xpos_conv):]
     # Plot the bar for the supply
-    fig = plt.bar(xpos_wf, 
+    fig_wf = plt.bar(xpos_wf, 
             height = y_wf,
             width = w_wf,
             fill = True,
-            color = "green",
+            color = col_wf,
             align = 'edge')
-    fig = plt.bar(xpos_conv, 
+    fig_conv = plt.bar(xpos_conv, 
             height = y_conv,
             width = w_conv,
             fill = True,
-            color = colors,
+            color = col_conv,
+            edgecolor = 'black',
             align = 'edge')
-    fig = plt.bar(xpos_constr, 
+    fig_constr = plt.bar(xpos_constr, 
             height = y_constr,
             width = w_constr,
             fill = True,
             color = "red",
             align = 'edge')
-    fig = plt.bar(xpos_not, 
+    fig_not = plt.bar(xpos_not, 
             height = y_not,
             width = w_not,
-            fill = False,
-            color = "blue",
-            align = 'edge')
-    # Legend with name of suppliers
-    # plt.legend(fig.patches, Generators["Name"].values.tolist(),
-    #           loc = "best",
-    #           ncol = 3)
+            fill = True,
+            color = 'darkgreen',
+            edgecolor = 'black',
+            align = 'edge',
+            alpha = 0.3)
     
+    # Legend with name of suppliers
+    plt.legend(fig_wf.patches+fig_conv.patches+fig_constr.patches+fig_not.patches, Generators["Name"].values.tolist(),
+              loc = "best",
+              ncol = 3)
     
     # Demands plotting
     max_demand = sum(Demands["Load"].values.tolist())
@@ -301,7 +305,8 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
     #             s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
     
     # Limit of the figure
-    plt.xlim(0, max(Generators["Capacity"].sum(),Demands["Load"].sum()+5))
+    # plt.xlim(0, max(Generators["Capacity"].sum()+5,Demands["Load"].sum()+5))
+    plt.xlim(0,4200)
     plt.ylim(0, max(Generators["Bid price"].max(),Demands["Offer price"].max()) + 10)
 
     plt.xlabel("Power plant capacity (MW)")
@@ -344,19 +349,116 @@ def Copper_plate_single_hour(Generators, Demands) :
     # Solving the optimization problem
     optimal_obj, optimal_gen, optimal_dem = Single_hour_optimization(Generators, Demands)
     # Clearing the price
-    clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
+    # clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
     # Calculating commodities
-    Social_welfare, Profits_of_suppliers, Utility_of_demands = Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price)
-    # Plotting the results
-    Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem)
+    # Social_welfare, Profits_of_suppliers, Utility_of_demands = Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price)
     
-# Copper_plate_single_hour(Generators, Demands)
+    #Necessary before plotting the values
+    # Order in ascending orders of bid price for easier treatment
+    Generators['Optimal'] = optimal_gen
+    Generators = Generators.sort_values(by=['Bid price', 'Optimal'], ascending=[True, False]).reset_index(drop=True)
+    # Order in descending orders of offer price for easier treatment
+    Demands['Optimal'] = optimal_dem
+    Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
+    # Get back the sorted optimal values
+    optimal_gen = Generators['Optimal'].to_list()
+    optimal_dem = Demands['Optimal'].to_list()
+    
+    # Plotting the results
+    Single_hour_plot(Generators, Demands, 30, optimal_gen, optimal_dem, "Single hour "+str(hour))
+    return (Generators, Demands, optimal_gen, optimal_dem)
+    
+    
+Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(Generators, Demands)
 
 
+############
+""" KKTs """
+############
 
+def KKTs(optimal_gen, optimal_dem, Generators, Demands):
+    my_G_underline=[]
+    my_G_overline=[]
+    my_D_underline=[]
+    my_D_overline=[]
+    
+    #equality constraints
+    equality_constraint = sum(optimal_dem) - sum(optimal_gen)
+    print("\n")
+    if equality_constraint != 0:
+        print("Equality constraint NOT fulfilled:", equality_constraint)
+    else:
+        print("Equality constraint fulfilled")
+    
 
+    #inequality constriants generators
+    for i in range(len(optimal_gen)):
+        if -optimal_gen[i]>0:
+            print("Inequality constraint 1 NOT fulfilled:", optimal_gen['Name'][i])
+        elif optimal_gen[i]==0:
+            print("Inequality constraint 1 = 0:", Generators['Name'][i])
+            my_G_underline.append(1)
+        else:
+            print("Inequality constraint 1 < 0:", Generators['Name'][i])
+            my_G_underline.append(0)
+            
+        if (optimal_gen[i]-Generators['Capacity'][i])>0:
+            print("Inequality constraint 2 NOT fulfilled:", Generators['Name'][i])
+        elif (optimal_gen[i]-Generators['Capacity'][i])==0:
+            print("Inequality constraint 2 = 0:", Generators['Name'][i])
+            my_G_overline.append(1)
+        else:
+            print("Inequality constraint 2 < 0:", Generators['Name'][i])
+            my_G_overline.append(0)
+           
+    print("\n")
+    
+    #inequality constriants generators
+    for i in range(len(optimal_dem)):
+        if -optimal_dem[i]>0:
+            print("Inequality constraint 3 NOT fulfilled:", optimal_dem[i])
+        elif optimal_dem[i]==0:
+            print("Inequality constraint 3 = 0:", Demands['Name'][i])
+            my_D_underline.append(None)
+        else:
+            print("Inequality constraint 3 < 0:", Demands['Name'][i])
+            my_D_underline.append(0)
+            
+        if (optimal_dem[i]-Demands['Load'][i])>0:
+            print("Inequality constraint 4 NOT fulfilled:", Demands['Name'][i])
+        elif (optimal_dem[i]-Demands['Load'][i])==0:
+            print("Inequality constraint 4 = 0:", Demands['Name'][i])
+            my_D_overline.append(None)
+        else:
+            print("Inequality constraint 4 < 0:", Demands['Name'][i])
+            my_D_overline.apped(0)
+            
+    print("\n"+"my_G_underline")            
+    for i, value in enumerate(optimal_gen):
+            print(my_G_underline[i])
+    print("\n"+"my_G_overline")
+    for i, value in enumerate(optimal_gen):
+            print(my_G_overline[i])
+    print("\n"+"my_D_underline")
+    for i, value in enumerate(optimal_dem):
+        print(my_D_underline[i]) 
+    print("\n"+"my_D_overline")
+    for i, value in enumerate(optimal_dem):
+        print(my_D_overline[i])  
+        
+    
+    #check for which generator my_G_underline and my_G_overline is equal to zero
+    #->last generator producing
+    for i in range(len(my_G_overline)):
+        if my_G_overline[i]==0 and my_G_underline[i]==0:
+            print("\n"+"Last Generator producing:", Generators['Name'][i]) 
+            
+            #get market price lambda out of derivative of lagrange
+            KKT_market_price= Generators['Bid price'][i]-my_G_underline[i]+my_G_overline[i]
+            print("\n"+"KKT market price: ", KKT_market_price) 
+    
 
-
+    return()
 
 
 

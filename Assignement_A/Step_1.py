@@ -48,7 +48,7 @@ GRB = gp.GRB
 
 if __name__ == "__main__":
     # Select only one hour
-    hour = 1
+    hour = 10
     for i in range(len(Demands)) :
         Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
         Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
@@ -115,6 +115,9 @@ def Single_hour_optimization(Generators, Demands) :
         print("Demand provided :")
         for i, value in enumerate(optimal_dem):
             print(Demands["Name"][i] + f" : {round(value,2)} MW")
+        
+        for c in model.getConstrs():
+            print(f"{c.ConstrName}: {c.Pi} : {c.Sense}")
     else:
         print("Optimization did not converge to an optimal solution.")
         
@@ -126,35 +129,30 @@ def Single_hour_optimization(Generators, Demands) :
 def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
     #Go through the different suppliers to find the clearing price
     # Condition for clearing and initialization
-    clearing = False
+    constraint = False
     clearing_price = 0
-    i = 0
-    while (clearing == False) and (i <= len(Generators)) :
+    for i in range(len(Generators)) :
         # For this producer, we take the quantity supplied and the maximum quantity
         max_cap = Generators['Capacity'][i]
         eff_cap = optimal_gen[i]
         # If the quantity supplied is higher than 0 but lower than the max quantity, the clearing price is equal to the bid price of this producer
-        if eff_cap > 0 and eff_cap < max_cap :
-            clearing_price = Generators['Bid price'][i]
-            # Finish the loop
-            clearing = True
-        # If the quantity supplied is equal to the maximum quantity and that we are not at the last producer
-        elif eff_cap == max_cap and i!= len(Generators)-1 :
+        
+        if eff_cap == max_cap :
             # Quantity supplied by the next producer
             next_eff_cap = optimal_gen[i+1]
             # If this quantity is different than 0, then we will indent i and go to the next producer by starting again the loop, storing current max clearing price
             if next_eff_cap != 0 :
                 clearing_price = Generators['Bid price'][i]
-                i += 1
             # If this quantity is equal to 0, that means that our bid price is in a range between the bid price of this producer and the bid price of the next one
             else :
                 next_bid_price = Generators['Bid price'][i+1]
                 clearing_price = [clearing_price, next_bid_price]
-                clearing = True
-        # If we arrive at the last producer without finishing the loop, then we have more demand and the clearing price is the bid price of the last producer
-        else :
+                constraint = True
+        
+        elif eff_cap > 0 and eff_cap < max_cap :
             clearing_price = Generators['Bid price'][i]
-            clearing = True
+            # In case of constraint
+            constraint = True
     
     # Print the clearing price and the quantity supplied
     print("\n")
@@ -263,7 +261,7 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
             color = 'darkgreen',
             edgecolor = 'black',
             align = 'edge',
-            alpha = 0.3)
+            alpha = 0.5)
     
     # Legend with name of suppliers
     plt.legend(fig_wf.patches+fig_conv.patches+fig_constr.patches+fig_not.patches, Generators["Name"].values.tolist(),
@@ -295,14 +293,16 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                 label = "Demand")
     
     # Small text for the clearing price and the quantity supplied
-    # if type(clearing_price) == list :
-    #     plt.text(x = sum(optimal_gen) - 10,
-    #             y = clearing_price[-1] + 10,
-    #             s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
-    # else :
-    #     plt.text(x = sum(optimal_gen) - 10,
-    #             y = clearing_price + 10,
-    #             s = f"Electricity price: {clearing_price} $/MWh \n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
+    if type(clearing_price) == list :
+        plt.text(x = sum(optimal_gen) - 1200,
+                y = clearing_price[-1] + 2,
+                ma = 'right',
+                s = f"Electricity price: {clearing_price} $/MWh\n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
+    else :
+        plt.text(x = sum(optimal_gen) - 1000 ,
+                y = clearing_price + 2 ,
+                ma = 'right',
+                s = f"Electricity price: {clearing_price} $/MWh\n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
     
     # Limit of the figure
     # plt.xlim(0, max(Generators["Capacity"].sum()+5,Demands["Load"].sum()+5))
@@ -348,8 +348,6 @@ def Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clea
 def Copper_plate_single_hour(Generators, Demands) :
     # Solving the optimization problem
     optimal_obj, optimal_gen, optimal_dem = Single_hour_optimization(Generators, Demands)
-    # Clearing the price
-    # clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
     # Calculating commodities
     # Social_welfare, Profits_of_suppliers, Utility_of_demands = Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price)
     
@@ -364,12 +362,14 @@ def Copper_plate_single_hour(Generators, Demands) :
     optimal_gen = Generators['Optimal'].to_list()
     optimal_dem = Demands['Optimal'].to_list()
     
+    # Clearing the price
+    clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
     # Plotting the results
-    Single_hour_plot(Generators, Demands, 30, optimal_gen, optimal_dem, "Single hour "+str(hour))
+    Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem, "Single hour "+str(hour))
     return (Generators, Demands, optimal_gen, optimal_dem)
     
     
-Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(Generators, Demands)
+# Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(Generators, Demands)
 
 
 ############

@@ -20,7 +20,7 @@ n_hour = 24
 # Index of the electrolyzer, change first numbers to change the place
 index_elec = {0:0, 1:1}
 # Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 20
+Hydro_demand = 0
 
 
 # Taking the hour supply and load information and optimizing on 24 hours
@@ -100,6 +100,10 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
         # Value of the optimal objective
         optimal_obj = model.ObjVal
         
+        # for c in model.getConstrs():
+        #     if c.Sense == GRB.EQUAL :
+        #         print(f"{c.ConstrName}: {c.Pi} : {c.Sense}")
+        
     else:
         print("Optimization did not converge to an optimal solution.")
     
@@ -141,9 +145,11 @@ def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen
 
 # Trying for only one hour    
 # optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
-# Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, 1)
+# Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, 6)
 # Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
-# Single_hour_plot(Supply_hour, Demands_hour, 30, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
+# clearing_price = Single_hour_price(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
+# Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
+
 
 
 #######################
@@ -158,7 +164,8 @@ def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     for i in range(1,25) :
         Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, i)
         Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
-        Single_hour_plot(Supply_hour, Demands_hour, 30, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(i))
+        clearing_price = Single_hour_price(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
+        Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(i))
         
         # Add a new row to the dataframe
         Electrolizer_1.loc[len(Electrolizer_1.index)] = [i, Wind_Farms_hour['Capacity'][index_elec[0]], optimal_elec_hour[0], Wind_Farms_hour['Optimal'][index_elec[0]]]  

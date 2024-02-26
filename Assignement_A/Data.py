@@ -107,6 +107,64 @@ Wind_Farms = pd.DataFrame([
     columns=['Name', 'Node', 'Capacity', 'Bid price'])
 
 
+##########################
+""" Transmission lines """
+##########################
+
+Transmission = pd.DataFrame([
+    ['Line 1', 1, 2, 0.0146, 175], ['Line 2',1, 3, 0.2253, 175], ['Line 3',1, 5, 0.0907, 350], ['Line 4',2, 4, 0.1356, 175], ['Line 5',2, 6, 0.205, 175], ['Line 6',3, 9, 0.1271, 175],
+    ['Line 7',3, 24, 0.084, 400], ['Line 8',4, 9, 0.111, 175], ['Line 9',5, 10, 0.094, 350], ['Line 10',6, 10, 0.0642, 175], ['Line 11',7, 8, 0.0652, 350], ['Line 12',8, 9, 0.1762, 175],
+    ['Line 13',8, 10, 0.1762, 175], ['Line 14',9, 11, 0.0084, 400], ['Line 15',9, 12, 0.084, 400], ['Line 16',10, 11, 0.084, 400], ['Line 17',10, 12, 0.084, 400], ['Line 18',11, 13, 0.0488, 500],
+    ['Line 19',11, 14, 0.0426, 500], ['Line 20',12, 13, 0.0488, 500], ['Line 21',12, 23, 0.0985, 500], ['Line 22',13, 23, 0.0884, 500], ['Line 23',14, 16, 0.0594, 500], ['Line 24',15, 16, 0.0172, 500],
+    ['Line 25',15, 21, 0.0249, 1000], ['Line 26',15, 24, 0.0529, 500], ['Line 27',16, 17, 0.0263, 500], ['Line 28',16, 19, 0.0234, 500], ['Line 29',17, 18, 0.0143, 500], ['Line 30',17, 22, 0.1069, 500],
+    ['Line 31',18, 21, 0.0132, 1000], ['Line 32',19, 20, 0.0203, 1000], ['Line 33',20, 23, 0.0112, 1000], ['Line 34',21, 22, 0.0692, 500]],
+    columns=['Name', 'From', 'To', 'Reactance', 'Capacity'])
+
+for i in range(len(Transmission)) :
+    Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
+    
+Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
+
+Nodes = {}
+
+for i in range(1,25) :
+    Nodes[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
+    
+# Read Demand dataframe
+for j in range(len(Demands)) :
+    node = Demands['Node'][j]
+    Nodes[node]["D"].append(j+1)
+    
+# Read Generators dataframe
+for j in range(len(Generators)) :
+    node = Generators['Node'][j]
+    Nodes[node]["G"].append(j+1)
+    
+# Read Wind Farm dataframe
+for j in range(len(Wind_Farms)) :
+    node = Wind_Farms['Node'][j]
+    Nodes[node]["W"].append(j+1)
+    
+# Read Transmission dataframe
+for j in range(len(Transmission)) :
+    node_from = Transmission['From'][j]
+    node_to = Transmission['To'][j]
+    susceptance = Transmission['Susceptance'][j]
+    Nodes[node_from]["L"].append([node_to, susceptance])
+    Nodes[node_to]["L"].append([node_from, susceptance])
+    
+# WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
+
+
+
+
+
+
+
+
+
+
+
 
 
 

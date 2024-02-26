@@ -20,7 +20,7 @@ n_hour = 24
 # Index of the electrolyzer, change first numbers to change the place
 index_elec = {0:0, 1:1}
 # Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 0
+Hydro_demand = 20
 
 
 # Taking the hour supply and load information and optimizing on 24 hours
@@ -150,6 +150,66 @@ def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen
 # clearing_price = Single_hour_price(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
 # Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
 
+#####################################################
+""" Visualize wind farm and electrolyzer capacity"""
+#####################################################
+
+# You can launch this file and will have two dataframe Electrolizer_1 adnd Electrolizer_2 with different columns :
+    # 'Hour' with the hour of the day
+    # 'Wind farm capacity' with the total wind electrical capacity
+    # 'Electrolyzer capacity' the capacity the electrolyzer is consuming at that time
+    # 'Grid provided capacity' the power sent to the grid at that hour
+
+# You can find the total demand per hour in the Dataframe Demand_total with columns :
+    # 'Hour' with the hour of the day
+    # 'Demand' with the total demand at that hour
+    
+
+def plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total):
+    fig, ax1 = plt.subplots(figsize=(20, 12))
+    plt.rcParams["font.size"] = 16
+    
+    # generate color palette
+    colors_wf = sns.color_palette('flare', 24)
+    colors_elec = sns.color_palette('Blues', 24)
+    
+    # choose colors out of palette
+    wf_1 = colors_wf[10]
+    wf_2 = colors_wf[20]
+    
+    elec_1=colors_elec[10]
+    elec_2=colors_elec[20]
+    
+    hours = np.arange(1, 25)
+    bar_width = 0.35
+    
+    # create bar diagram
+    ax1.bar(hours - bar_width/2, Electrolizer_1['Wind farm capacity'],bar_width, fill = True, color = wf_1,label='Wind farm 1')
+    ax1.bar(hours - bar_width/2, Electrolizer_1['Electrolyzer capacity'], bar_width, fill = True, color = elec_1, bottom=0, label='Electrolyzer 1')
+    
+    ax1.bar(hours + bar_width/2, Electrolizer_2['Wind farm capacity'], bar_width, fill = True, color = wf_2 ,label='Wind farm 2')
+    ax1.bar(hours + bar_width/2, Electrolizer_2['Electrolyzer capacity'], bar_width, fill = True, color = elec_2, bottom=0, label='Electrolyzer 2')
+    
+    # create second axis with line diagram
+    ax2 = ax1.twinx()
+    ax2.set_ylim(0, 2700)
+    ax2.plot(hours, Demand_total['Demand'], color='darkgreen', linestyle='-', marker='o', label='Total demand')
+    ax2.set_ylabel('total demand (MW)')
+    
+    # Legend for second x axis
+    ax2.legend(loc='upper right')
+    
+    # Set x-axis limits and ticks
+    ax1.set_ylim(0, 200)
+    ax1.set_xlim(0.5, 24.5)
+    ax1.set_xticks(np.arange(1, 25, step=1))
+    
+    # x and y axis label
+    ax1.set_xlabel('hours')
+    ax1.set_ylabel('capacity (MW)')
+    ax1.legend(loc='upper left')
+    
+    plt.show()
 
 
 #######################
@@ -175,22 +235,9 @@ def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     return(Electrolizer_1, Electrolizer_2, Demand_total)
         
 Electrolizer_1, Electrolizer_2, Demand_total = Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
+plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total)
 
 
-#######################
-""" For Leonie """
-#######################
-
-# You can launch this file and will have two dataframe Electrolizer_1 adnd Electrolizer_2 with different columns :
-    # 'Hour' with the hour of the day
-    # 'Wind farm capacity' with the total wind electrical capacity
-    # 'Electrolyzer capacity' the capacity the electrolyzer is consuming at that time
-    # 'Grid provided capacity' the power sent to the grid at that hour
-
-# You can find the total demand per hour in the Dataframe Demand_total with columns :
-    # 'Hour' with the hour of the day
-    # 'Demand' with the total demand at that hour
-    
     
 
 

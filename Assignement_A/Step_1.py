@@ -48,7 +48,7 @@ GRB = gp.GRB
 
 if __name__ == "__main__":
     # Select only one hour
-    hour = 10
+    hour = 6
     for i in range(len(Demands)) :
         Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
         Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
@@ -311,11 +311,11 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
 
     plt.xlabel("Power plant capacity (MW)")
     plt.ylabel("Bid price ($/MWh)")
-    plt.title(Title)
+    # plt.title(Title)
     output_folder = os.path.join(os.getcwd(), 'plots')
     pdf_name = Title+'.pdf'
     pdf_filename = os.path.join(output_folder, pdf_name)
-    plt.savefig(pdf_filename)
+    plt.savefig(pdf_filename,  bbox_inches='tight')
     plt.show()
     
     
@@ -369,7 +369,7 @@ def Copper_plate_single_hour(Generators, Demands) :
     return (Generators, Demands, optimal_gen, optimal_dem)
     
     
-# Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(Generators, Demands)
+Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(Generators, Demands)
 
 
 ############

@@ -221,6 +221,7 @@ def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     Electrolizer_1 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
     Electrolizer_2 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
     Demand_total = pd.DataFrame(columns=['Hour', 'Demand'])
+    all_dataframes = []
     for i in range(1,25) :
         Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, i)
         Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
@@ -231,6 +232,13 @@ def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
         Electrolizer_1.loc[len(Electrolizer_1.index)] = [i, Wind_Farms_hour['Capacity'][index_elec[0]], optimal_elec_hour[0], Wind_Farms_hour['Optimal'][index_elec[0]]]  
         Electrolizer_2.loc[len(Electrolizer_2.index)] = [i, Wind_Farms_hour['Capacity'][index_elec[1]], optimal_elec_hour[1], Wind_Farms_hour['Optimal'][index_elec[1]]]  
         Demand_total.loc[len(Demand_total.index)] = [i, Demands_hour['Optimal'].sum()]
+        
+        # Output of all the dataframe
+        all_dataframes.append(Supply_hour)
+    
+    # Output of the excel
+    final_dataframe = pd.concat(all_dataframes, ignore_index=True)
+    final_dataframe.to_excel('output_file.xlsx', index=False)
         
     return(Electrolizer_1, Electrolizer_2, Demand_total)
         

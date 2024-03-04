@@ -80,8 +80,8 @@ def Single_hour_optimization(hour, Generators, Demands) :
     # Create the model
     model = gp.Model()
     # Initialize the decision variables
-    var_gen = model.addVars(n_gen, vtype=GRB.CONTINUOUS, name='gen')
-    var_dem = model.addVars(n_dem, vtype=GRB.CONTINUOUS, name='dem')
+    var_gen = model.addVars(n_gen, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='gen')
+    var_dem = model.addVars(n_dem, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='dem')
     # Add the objective function to the model
     model.setObjective(gp.quicksum(Demands['Offer price'][i]*var_dem[i] for i in range(n_dem))-gp.quicksum(Generators['Bid price'][i]*var_gen[i] for i in range(n_gen)), GRB.MAXIMIZE)
     # Add constraints to the model

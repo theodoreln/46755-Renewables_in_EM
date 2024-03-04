@@ -150,8 +150,9 @@ for j in range(len(Transmission)) :
     node_from = Transmission['From'][j]
     node_to = Transmission['To'][j]
     susceptance = Transmission['Susceptance'][j]
-    Nodes[node_from]["L"].append([node_to, susceptance])
-    Nodes[node_to]["L"].append([node_from, susceptance])
+    capacity = Transmission['Capacity'][j]
+    Nodes[node_from]["L"].append([node_to, susceptance, capacity])
+    Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     
 # WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
 

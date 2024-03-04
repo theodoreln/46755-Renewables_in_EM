@@ -48,7 +48,7 @@ GRB = gp.GRB
 
 if __name__ == "__main__":
     # Select only one hour
-    hour = 6
+    hour = 15
     for i in range(len(Demands)) :
         Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
         Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 ###############################################
         
 # Taking the hour supply and load information and optimizing (see lecture 2)
-def Single_hour_optimization(Generators, Demands) :
+def Single_hour_optimization(hour, Generators, Demands) :
     # Global variables
     global optimal_gen, optimal_dem
     # Numbers of generators and demanding units
@@ -82,19 +82,24 @@ def Single_hour_optimization(Generators, Demands) :
     # Initialize the decision variables
     var_gen = model.addVars(n_gen, vtype=GRB.CONTINUOUS, name='gen')
     var_dem = model.addVars(n_dem, vtype=GRB.CONTINUOUS, name='dem')
-    # Add constraints to the model
-    # Quantity supplied = Quantity used
-    model.addConstr(gp.quicksum(var_dem[i] for i in range(n_dem)) - gp.quicksum(var_gen[i] for i in range(n_gen)) == 0)
-    # Quantities supplied can't be higher than maximum quantities
-    for i in range(n_gen) :
-        model.addConstr(var_gen[i] <= Generators['Capacity'][i])
-        model.addConstr(var_gen[i] >= 0)
-    # Quantities used can't be hihher than maximum demands
-    for i in range(n_dem) :
-        model.addConstr(var_dem[i] <= Demands['Load'][i])
-        model.addConstr(var_dem[i] >= 0)
     # Add the objective function to the model
     model.setObjective(gp.quicksum(Demands['Offer price'][i]*var_dem[i] for i in range(n_dem))-gp.quicksum(Generators['Bid price'][i]*var_gen[i] for i in range(n_gen)), GRB.MAXIMIZE)
+    # Add constraints to the model
+    # Quantity supplied = Quantity used
+    # Constr_power_balance = model.addConstr(gp.quicksum(var_dem[i] for i in range(n_dem)) - gp.quicksum(var_gen[i] for i in range(n_gen)) == 0, name='Power balance')
+    model.addConstr(gp.quicksum(var_dem[i] for i in range(n_dem)) - gp.quicksum(var_gen[i] for i in range(n_gen)) == 0, name='Power balance')
+    # Quantities supplied can't be higher than maximum quantities
+    for i in range(n_gen) :
+        name_constr = f"{Generators['Name'][i]}_uplim_{i}"
+        model.addConstr(var_gen[i] <= Generators['Capacity'][i], name=name_constr)
+        name_constr = f"{Generators['Name'][i]}_downlim_{i}"
+        model.addConstr(var_gen[i] >= 0.0, name=name_constr)
+    # Quantities used can't be hihher than maximum demands
+    for i in range(n_dem) :
+        name_constr = f"{Demands['Name'][i]}_uplim_{i}"
+        model.addConstr(var_dem[i] <= Demands['Load'][i], name=name_constr)
+        name_constr = f"{Demands['Name'][i]}_downlim_{i}"
+        model.addConstr(var_dem[i] >= 0.0, name=name_constr)
     # Solve the problem
     model.optimize()
     
@@ -115,16 +120,42 @@ def Single_hour_optimization(Generators, Demands) :
         print("Demand provided :")
         for i, value in enumerate(optimal_dem):
             print(Demands["Name"][i] + f" : {round(value,2)} MW")
+            
+        """ KKTs output """
+        # Write KKT's condition in a text file
+        # Define the folder path and the file name
+        folder_path = "results/single_hour"
+        file_name = f"KKTs_{hour}.txt"
         
-        for c in model.getConstrs():
-            print(f"{c.ConstrName}: {c.Pi} : {c.Sense}")
+        # Create the folder if it doesn't exist
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        
+        # Combine the folder path and file name
+        file_path = os.path.join(folder_path, file_name)
+        
+        # Open the file in write mode
+        with open(file_path, 'w') as file:
+            file.write(f"KKTs for the single hour optimization in hour {hour} :")
+            file.write("\n\n")
+            # Write lines to the file
+            for c in model.getConstrs():
+                file.write(f"{c.ConstrName}: {c.Pi} : {c.Sense} \n")
+                if c.ConstrName == 'Power balance' :
+                    equilibrium_price = c.Pi
+                    
+        print("\n")
+        print(f"Equilibrium price : {equilibrium_price} $/MWh")
+        print(f"Quantity provided : {round(sum(optimal_gen),2)} $/MWh")
+       
     else:
         print("Optimization did not converge to an optimal solution.")
         
     # Return the cost and the optimal values
-    return(optimal_obj, optimal_gen, optimal_dem)
+    return(optimal_obj, optimal_gen, optimal_dem, equilibrium_price)
     
 
+""" We don't need this anymore if we are taking the price from the optimization 
 # Taking the optimization and giving the clearing price
 def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
     #Go through the different suppliers to find the clearing price
@@ -159,6 +190,7 @@ def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
     print(f"Clearing price : {clearing_price} $/MWh")
     print("Quantity provided : " + str(round(sum(optimal_dem),2)) + " MW")
     return(clearing_price)
+"""
 
 
 # Plotting the solution of the clearing for an hour and demands and generators entries
@@ -302,7 +334,7 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
         plt.text(x = sum(optimal_gen) - 1000 ,
                 y = clearing_price + 2 ,
                 ma = 'right',
-                s = f"Electricity price: {clearing_price} $/MWh\n Quantity : " + str(round(sum(optimal_dem),2)) + "MW")
+                s = f"Electricity price: {clearing_price} $/MWh\n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
     
     # Limit of the figure
     # plt.xlim(0, max(Generators["Capacity"].sum()+5,Demands["Load"].sum()+5))
@@ -345,9 +377,9 @@ def Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clea
 """ Global function """
 #######################
 
-def Copper_plate_single_hour(Generators, Demands) :
+def Copper_plate_single_hour(hour, Generators, Demands) :
     # Solving the optimization problem
-    optimal_obj, optimal_gen, optimal_dem = Single_hour_optimization(Generators, Demands)
+    optimal_obj, optimal_gen, optimal_dem, equilibrium_price = Single_hour_optimization(hour, Generators, Demands)
     # Calculating commodities
     # Social_welfare, Profits_of_suppliers, Utility_of_demands = Commodities(Generators, Demands, optimal_gen, optimal_dem, optimal_obj, clearing_price)
     
@@ -363,13 +395,13 @@ def Copper_plate_single_hour(Generators, Demands) :
     optimal_dem = Demands['Optimal'].to_list()
     
     # Clearing the price
-    clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
+    # clearing_price = Single_hour_price(Generators, Demands, optimal_gen, optimal_dem)
     # Plotting the results
-    Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem, "Single hour "+str(hour))
+    Single_hour_plot(Generators, Demands, equilibrium_price, optimal_gen, optimal_dem, "Single hour "+str(hour))
     return (Generators, Demands, optimal_gen, optimal_dem)
     
     
-# Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(Generators, Demands)
+Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(hour, Generators, Demands)
 
 
 ############
@@ -460,6 +492,7 @@ def KKTs(optimal_gen, optimal_dem, Generators, Demands):
 
     return()
 
+# KKTs(optimal_gen, optimal_dem, Generators, Demands)
 
 
 

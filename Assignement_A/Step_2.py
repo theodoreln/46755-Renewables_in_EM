@@ -1,12 +1,13 @@
 
 from Data import Generators, Demands, Wind_Farms
-from Step_1 import Single_hour_price, Single_hour_plot, Commodities
+from Step_1 import Single_hour_plot, Commodities
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import gurobipy as gp
 import copy
+import os
 GRB = gp.GRB
 
 
@@ -54,7 +55,8 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
     #Add constraints to the model
     # Quantity supplied = Quantity used for every time step t
     for t in range(n_hour):
-        model.addConstr(gp.quicksum(var_dem[d,t] for d in range(n_dem)) - gp.quicksum(var_conv_gen[g,t] for g in range(n_gen)) - gp.quicksum(var_wf_gen[wf,t] for wf in range(n_wf)) == 0)
+        constr_name = f"Power balance hour {t+1}"
+        model.addConstr(gp.quicksum(var_dem[d,t] for d in range(n_dem)) - gp.quicksum(var_conv_gen[g,t] for g in range(n_gen)) - gp.quicksum(var_wf_gen[wf,t] for wf in range(n_wf)) == 0, name = constr_name)
     # Constraint that must be fullfilled for every time ste
     for t in range(n_hour) :
         for g in range(n_gen) :
@@ -97,17 +99,37 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
         optimal_wf_gen = [[round(var_wf_gen[wf,t].X,2) for wf in range(n_wf)] for t in range(n_hour)]
         optimal_dem = [[round(var_dem[d,t].X,2) for d in range(n_dem)] for t in range(n_hour)]
         optimal_elec = [[round(var_elec[e,t].X,2) for e in range(2)] for t in range(n_hour)]
+        equilibrium_prices = []
         # Value of the optimal objective
         optimal_obj = model.ObjVal
         
-        # for c in model.getConstrs():
-        #     if c.Sense == GRB.EQUAL :
-        #         print(f"{c.ConstrName}: {c.Pi} : {c.Sense}")
+        """ KKTs output """
+        # Write KKT's condition in a text file
+        # Define the folder path and the file name
+        folder_path = "results/multiple_hour"
+        file_name = "KKTs.txt"
+        
+        # Create the folder if it doesn't exist
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        
+        # Combine the folder path and file name
+        file_path = os.path.join(folder_path, file_name)
+        
+        # Open the file in write mode
+        with open(file_path, 'w') as file:
+            file.write("KKTs for the multiple hour optimization :")
+            file.write("\n\n")
+            # Write lines to the file
+            for c in model.getConstrs():
+                file.write(f"{c.ConstrName}: {c.Pi} : {c.Sense} \n")
+                if 'Power balance hour' in c.constrName :
+                    equilibrium_prices.append(c.Pi)
         
     else:
         print("Optimization did not converge to an optimal solution.")
     
-    return(optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec)
+    return(optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices)
 
 
 #####################################
@@ -115,7 +137,7 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
 #####################################
 
 # Function to select the value for only one hour out of the all day
-def Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, select_hour) :
+def Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, select_hour) :
     Generators_hour = Generators.copy(deep=True)
     Wind_Farms_hour = Wind_Farms.copy(deep=True)
     for wf in range(len(Wind_Farms)) :
@@ -129,7 +151,8 @@ def Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optim
     optimal_wf_gen_hour = optimal_wf_gen[select_hour-1]
     optimal_dem_hour = optimal_dem[select_hour-1]
     optimal_elec_hour = optimal_elec[select_hour-1]
-    return(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour)
+    equilibrium_price = equilibrium_prices[select_hour-1]
+    return(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price)
 
 # Function to put back the capacities and the optimal values in the right order so we can easily have the price 
 def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour) :
@@ -217,16 +240,15 @@ def plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total):
 #######################
 
 def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
-    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
     Electrolizer_1 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
     Electrolizer_2 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
     Demand_total = pd.DataFrame(columns=['Hour', 'Demand'])
     all_dataframes = []
     for i in range(1,25) :
-        Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, i)
+        Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, i)
         Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
-        clearing_price = Single_hour_price(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
-        Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(i))
+        Single_hour_plot(Supply_hour, Demands_hour, equilibrium_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(i))
         
         # Add a new row to the dataframe
         Electrolizer_1.loc[len(Electrolizer_1.index)] = [i, Wind_Farms_hour['Capacity'][index_elec[0]], optimal_elec_hour[0], Wind_Farms_hour['Optimal'][index_elec[0]]]  

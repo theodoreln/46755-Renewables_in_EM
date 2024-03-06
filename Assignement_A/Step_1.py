@@ -401,7 +401,7 @@ def Copper_plate_single_hour(hour, Generators, Demands) :
     return (Generators, Demands, optimal_gen, optimal_dem)
     
     
-Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(hour, Generators, Demands)
+# Generators, Demands, optimal_gen, optimal_dem = Copper_plate_single_hour(hour, Generators, Demands)
 
 
 ############

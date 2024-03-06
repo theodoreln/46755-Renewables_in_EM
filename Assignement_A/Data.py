@@ -126,24 +126,67 @@ for i in range(len(Transmission)) :
 Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
 
 Nodes = {}
+Zones_2 = {}
+Zones_2_1 = [1,2,3,4,5,6,7,8,9,10,11,12,13]
+Zones_2_2 = [14,15,16,17,18,19,20,21,22,23,24]
+Zones_3 = {}
+Zones_3_1 = [1,2,3,4,5,6,7,8,9,10]
+Zones_3_2 = [11,12,13,14,19,20,22,23,24]
+Zones_3_3 = [15,16,17,18,21]
 
 for i in range(1,25) :
     Nodes[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
+    
+for i in range(1,3) :
+    Zones_2[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
+
+for i in range(1,4) :
+    Zones_3[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
     
 # Read Demand dataframe
 for j in range(len(Demands)) :
     node = Demands['Node'][j]
     Nodes[node]["D"].append(j+1)
+    if node in Zones_2_1 :
+        Zones_2[1]["D"].append(j+1)
+    elif node in Zones_2_2 :
+        Zones_2[2]["D"].append(j+1)
+    if node in Zones_3_1 :
+        Zones_3[1]["D"].append(j+1)
+    elif node in Zones_3_2 :
+        Zones_3[2]["D"].append(j+1)
+    elif node in Zones_3_3 :
+        Zones_3[3]["D"].append(j+1)
     
 # Read Generators dataframe
 for j in range(len(Generators)) :
     node = Generators['Node'][j]
     Nodes[node]["G"].append(j+1)
+    if node in Zones_2_1 :
+        Zones_2[1]["G"].append(j+1)
+    elif node in Zones_2_2 :
+        Zones_2[2]["G"].append(j+1)
+    if node in Zones_3_1 :
+        Zones_3[1]["G"].append(j+1)
+    elif node in Zones_3_2 :
+        Zones_3[2]["G"].append(j+1)
+    elif node in Zones_3_3 :
+        Zones_3[3]["G"].append(j+1)
     
 # Read Wind Farm dataframe
 for j in range(len(Wind_Farms)) :
     node = Wind_Farms['Node'][j]
     Nodes[node]["W"].append(j+1)
+    if node in Zones_2_1 :
+        Zones_2[1]["W"].append(j+1)
+    elif node in Zones_2_2 :
+        Zones_2[2]["W"].append(j+1)
+    if node in Zones_3_1 :
+        Zones_3[1]["W"].append(j+1)
+    elif node in Zones_3_2 :
+        Zones_3[2]["W"].append(j+1)
+    elif node in Zones_3_3 :
+        Zones_3[3]["W"].append(j+1)
     
 # Read Transmission dataframe
 for j in range(len(Transmission)) :
@@ -154,6 +197,17 @@ for j in range(len(Transmission)) :
     Nodes[node_from]["L"].append([node_to, susceptance, capacity])
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     
+# Transmission between zones
+Zones_2[1]["L"].append([2,1000,1000])
+Zones_2[2]["L"].append([1,1000,1000])
+
+Zones_3[1]["L"].append([2,1000,1000])
+Zones_3[1]["L"].append([3,1000,1000])
+Zones_3[2]["L"].append([1,1000,1000])
+Zones_3[2]["L"].append([3,1000,1000])
+Zones_3[3]["L"].append([1,1000,1000])
+Zones_3[3]["L"].append([2,1000,1000])
+
 # WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
 
 

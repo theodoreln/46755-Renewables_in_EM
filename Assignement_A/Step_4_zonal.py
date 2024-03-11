@@ -76,7 +76,7 @@ def Zonal_optimization(Generators, Wind_Farms, Demands, Zones) :
                 
             # Transmission line limits
             for l in L :
-                m, atc_neg, atc_pos = l
+                m, atc_pos, atc_neg = l
                 model.addConstr(var_trade[n-1,m-1,t] >= -atc_neg)
                 model.addConstr(var_trade[n-1,m-1,t] <= atc_pos)
         
@@ -178,7 +178,7 @@ def Zonal_optimization(Generators, Wind_Farms, Demands, Zones) :
 """ Written output of transmission decision and prices """
 ##########################################################
 
-def Zonal_transmission_prices(Zones, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices) :
+def Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices) :
     # Number of zones
     n_zones = len(Zones)
     
@@ -200,36 +200,103 @@ def Zonal_transmission_prices(Zones, optimal_conv_gen, optimal_wf_gen, optimal_d
         file.write("\n\n")
         
         for t in range(n_hour) :
-            file.write(f"\n---------- Hour {t+1} ----------")
+            file.write(f"\n------------------------------------------------")
+            file.write(f"\n-------------------- Hour {t+1} --------------------")
             file.write("\n\n")
             
             for n in range(n_zones) :
                 file.write(f"---------- Zone {n+1} ----------\n")
-                file.write(f"Equilibrium price : {round(equilibrium_prices[n,t],2)}\n")
+                file.write(f"*Equilibrium price : {round(equilibrium_prices[n,t],2)}*\n")
                 
                 D = Zones[n+1]["D"] #take the demand information corresponding to each node
                 G = Zones[n+1]["G"] #take the generator information corresponding to each node
                 W = Zones[n+1]["W"] #take the wind farm information corresponding to each node
                 Gen = round(sum([optimal_conv_gen[t][g-1] for g in G]) + sum([optimal_wf_gen[t][w-1] for w in W]),2)
+                Gen_tot = round(sum([Generators['Capacity'][g-1] for g in G]) + sum([Wind_Farms['Capacity'][w-1][t] for w in W]) - sum([optimal_elec[t][index_elec[w-1]] for w in W if w-1 in index_elec]),2)
                 Dem = round(sum([optimal_dem[t][d-1] for d in D]),2)
+                Dem_tot = round(sum([Demands["Load"][d-1][t] for d in D]),2)
                 
-                file.write(f"Power generation : {Gen}\n")
-                file.write(f"Power demand : {Dem}\n")
+                file.write(f"\nPower generation : {Gen}/{Gen_tot} MW\n")
+                for g in G :
+                    file.write(f"      {Generators['Name'][g-1]} : {optimal_conv_gen[t][g-1]}/{Generators['Capacity'][g-1]} MW\n")
+                for w in W :
+                    if w-1 in index_elec :
+                        file.write(f"      {Wind_Farms['Name'][w-1]} : {optimal_wf_gen[t][w-1]}/{round(Wind_Farms['Capacity'][w-1][t] - optimal_elec[t][index_elec[w-1]],2)} MW\n")
+                        file.write(f"          Electrolyzer : {optimal_elec[t][index_elec[w-1]]} MW\n")
+                    else :
+                        file.write(f"      {Wind_Farms['Name'][w-1]} : {optimal_wf_gen[t][w-1]}/{Wind_Farms['Capacity'][w-1][t]} MW\n")
+                file.write(f"\nPower demand : {Dem}/{Dem_tot} MW\n")
+                for d in D :
+                    if optimal_dem[t][d-1] != Demands['Load'][d-1][t] :
+                        file.write(f"      {Demands['Name'][d-1]} : {optimal_dem[t][d-1]}/{Demands['Load'][d-1][t]} MW ----> Demand not fulfilled\n")
+                    else :
+                        file.write(f"      {Demands['Name'][d-1]} : {optimal_dem[t][d-1]}/{Demands['Load'][d-1][t]} MW\n")
                 
+                file.write("\n")
                 for m in range(n_zones) :
                     if m != n and m+1 in [Zones[n+1]["L"][l][0] for l in range(len(Zones[n+1]["L"]))]:
-                        file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}\n")
+                        if optimal_trans[n,m,t] > 0 :
+                            index_lim = next((index for index, sublist in enumerate(Zones[n+1]["L"]) if sublist[0]==m+1), None)
+                            if optimal_trans[n,m,t] == Zones[n+1]['L'][index_lim][1] :
+                                file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}/{Zones[n+1]['L'][index_lim][1]} MW ----> Line saturated !!!\n")
+                            else :
+                                file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}/{Zones[n+1]['L'][index_lim][1]} MW\n")
+                        else :
+                            index_lim = next((index for index, sublist in enumerate(Zones[n+1]["L"]) if sublist[0]==m+1), None)
+                            if optimal_trans[n,m,t] == -Zones[n+1]['L'][index_lim][2] :
+                                file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}/{-Zones[n+1]['L'][index_lim][2]} MW ----> Line saturated !!!\n")
+                            else :
+                                file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}/{-Zones[n+1]['L'][index_lim][2]} MW\n")
+                file.write("\n")
+                        
+#########################################
+""" Sensitivity analysis and plotting """
+#########################################
 
-   
-T_2 = [[1,2,1000,1000]]
-T_3 = [[1,2,1000,1000],[2,3,1000,1000]]  
-# ,[1,3,1000,1000]
-Zones_2 = Transmission_input(Zones_2, T_2)  
-Zones_3 = Transmission_input(Zones_3, T_3)                    
+# Function for the sensitivity analysis 
+def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
+    # Step to repeat for every case 
+    nb_case = len(Case)
+    Prices = []
+    for i in range(nb_case) :
+        Zones_case = 0
+        Zones_case = Transmission_input(Zones, Case[i])
+        optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones_case)
+        Zonal_transmission_prices(Zones_case, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
+        Prices.append(equilibrium_prices)
+    # Plot everything
+    Case_1 = Prices[0][0].tolist()
+    Zone_1 = Prices[1][0].tolist()
+    Zone_2 = Prices[1][1].tolist()
+    Zone_3 = Prices[1][2].tolist()
+    t = list(range(1,25))
+    plt.figure(figsize = (10, 6))
+    plt.rcParams["font.size"] = 16
+    plt.plot(t, Case_1, 'k+-', label='Case 1')
+    plt.plot(t, Zone_1, 'b-', label='Zone 1')
+    plt.plot(t, Zone_2, 'r-', label='Zone 2')
+    plt.plot(t, Zone_3, 'y-', label='Zone 3')
+    plt.xlabel('Time [h]')
+    plt.ylabel(' Market clearing price [$/MWh]')
+    plt.legend()
+    plt.show()
+    
+################################################
+""" Launching the functions for the analysis """
+################################################
 
-Zones = Zones_3
-optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones)
-Zonal_transmission_prices(Zones, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
+# Launching when we want to plot and to compare two case (keep the first case as the maximum case I think !!)
+Case = [[[1,2,1000,1000],[2,3,1000,1000]], [[1,2,500,500],[2,3,500,500]]]
+Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones_3, Case)
+
+# When you want only one case, and to have the output text file
+# T_2 = [[1,2,1000,1000]]
+# T_3 = [[1,2,500,1000],[2,3,500,1000]]  
+# Zones_2 = Transmission_input(Zones_2, T_2)  
+# Zones_3 = Transmission_input(Zones_3, T_3)                    
+# Zones = Zones_3
+# optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones)
+# Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
 
 
 

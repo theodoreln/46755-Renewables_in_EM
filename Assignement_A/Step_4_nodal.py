@@ -46,15 +46,15 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
     model = gp.Model()
     #Initialize the decision variables, each one of them is now time dependant
     # Capacities provided by conventional generation units
-    var_conv_gen = model.addVars(n_gen, n_hour, vtype=GRB.CONTINUOUS, name='conv_gen')
+    var_conv_gen = model.addVars(n_gen, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='conv_gen')
     # Capacities provided by wind farms
-    var_wf_gen = model.addVars(n_wf, n_hour, vtype=GRB.CONTINUOUS, name='wf_gen')
+    var_wf_gen = model.addVars(n_wf, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='wf_gen')
     # Demand capacities fullfilled
-    var_dem = model.addVars(n_dem, n_hour, vtype=GRB.CONTINUOUS, name='dem')
+    var_dem = model.addVars(n_dem, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='dem')
     # Capacities provided to the electrolyzer
-    var_elec = model.addVars(len(index_elec), n_hour, vtype=GRB.CONTINUOUS, name='elec')
+    var_elec = model.addVars(len(index_elec), n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='elec')
     #Load angle for each node
-    var_theta = model.addVars(n_nodes, n_hour, vtype=GRB.CONTINUOUS, name='Theta')
+    var_theta = model.addVars(n_nodes, n_hour, lb=-3.14159, ub=3.14159, vtype=GRB.CONTINUOUS, name='Theta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
     model.setObjective(gp.quicksum(gp.quicksum(Demands['Offer price'][d][t]*var_dem[d,t] for d in range(n_dem))-gp.quicksum(Generators['Bid price'][g]*var_conv_gen[g,t] for g in range(n_gen))-gp.quicksum(Wind_Farms['Bid price'][wf][t]*var_wf_gen[wf,t] for wf in range(n_wf)) for t in range(n_hour)), GRB.MAXIMIZE)

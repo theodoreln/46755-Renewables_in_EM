@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import copy
 
 
 ###################################
@@ -200,11 +201,12 @@ for j in range(len(Transmission)) :
     
 # Function to input easily the transmission capacity in the Zones dict
 def Transmission_input(Zones, T) :
+    Zones_new = copy.deepcopy(Zones)
     for t in T :
         node, nodep, back, forth = t
-        Zones[node]["L"].append([nodep,back,forth])
-        Zones[nodep]["L"].append([node,forth,back])
-    return(Zones)
+        Zones_new[node]["L"].append([nodep,back,forth])
+        Zones_new[nodep]["L"].append([node,forth,back])
+    return(Zones_new)
 
 # WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
 

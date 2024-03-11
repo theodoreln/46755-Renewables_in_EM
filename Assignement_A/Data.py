@@ -197,16 +197,14 @@ for j in range(len(Transmission)) :
     Nodes[node_from]["L"].append([node_to, susceptance, capacity])
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     
-# Transmission between zones
-Zones_2[1]["L"].append([2,1000,1000])
-Zones_2[2]["L"].append([1,1000,1000])
-
-Zones_3[1]["L"].append([2,1000,1000])
-Zones_3[1]["L"].append([3,1000,1000])
-Zones_3[2]["L"].append([1,1000,1000])
-Zones_3[2]["L"].append([3,1000,1000])
-Zones_3[3]["L"].append([1,1000,1000])
-Zones_3[3]["L"].append([2,1000,1000])
+    
+# Function to input easily the transmission capacity in the Zones dict
+def Transmission_input(Zones, T) :
+    for t in T :
+        node, nodep, back, forth = t
+        Zones[node]["L"].append([nodep,back,forth])
+        Zones[nodep]["L"].append([node,forth,back])
+    return(Zones)
 
 # WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
 

@@ -193,7 +193,9 @@ for j in range(len(Wind_Farms)) :
 for j in range(len(Transmission)) :
     node_from = Transmission['From'][j]
     node_to = Transmission['To'][j]
-    susceptance = Transmission['Susceptance'][j]
+    susceptance = 500
+    # susceptance = Transmission['Susceptance'][j]
+    # capacity = 100
     capacity = Transmission['Capacity'][j]
     Nodes[node_from]["L"].append([node_to, susceptance, capacity])
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])

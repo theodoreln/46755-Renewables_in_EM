@@ -1,5 +1,5 @@
 
-from Data import Generators, Demands, Wind_Farms, Transmission, Zones_2, Zones_3
+from Data import Generators, Demands, Wind_Farms, Transmission, Zones_2, Zones_3, Transmission_input
 from Step_1 import Single_hour_plot, Commodities
 import numpy as np
 import matplotlib.pyplot as plt
@@ -205,22 +205,27 @@ def Zonal_transmission_prices(Zones, optimal_conv_gen, optimal_wf_gen, optimal_d
             
             for n in range(n_zones) :
                 file.write(f"---------- Zone {n+1} ----------\n")
-                file.write(f"Equilibrium price : {equilibrium_prices[n,t]}\n")
+                file.write(f"Equilibrium price : {round(equilibrium_prices[n,t],2)}\n")
                 
                 D = Zones[n+1]["D"] #take the demand information corresponding to each node
                 G = Zones[n+1]["G"] #take the generator information corresponding to each node
                 W = Zones[n+1]["W"] #take the wind farm information corresponding to each node
-                Gen = sum([optimal_conv_gen[t][g-1] for g in G]) + sum([optimal_wf_gen[t][w-1] for w in W])
-                Dem = sum([optimal_dem[t][d-1] for d in D])
+                Gen = round(sum([optimal_conv_gen[t][g-1] for g in G]) + sum([optimal_wf_gen[t][w-1] for w in W]),2)
+                Dem = round(sum([optimal_dem[t][d-1] for d in D]),2)
                 
                 file.write(f"Power generation : {Gen}\n")
                 file.write(f"Power demand : {Dem}\n")
                 
                 for m in range(n_zones) :
-                    if m != n :
+                    if m != n and m+1 in [Zones[n+1]["L"][l][0] for l in range(len(Zones[n+1]["L"]))]:
                         file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}\n")
 
-                        
+   
+T_2 = [[1,2,1000,1000]]
+T_3 = [[1,2,1000,1000],[2,3,1000,1000]]  
+# ,[1,3,1000,1000]
+Zones_2 = Transmission_input(Zones_2, T_2)  
+Zones_3 = Transmission_input(Zones_3, T_3)                    
 
 Zones = Zones_3
 optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones)

@@ -21,7 +21,7 @@ n_hour = 24
 # Index of the electrolyzer, change first numbers to change the place
 index_elec = {0:0, 1:1}
 # Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 20
+Hydro_demand = 0
 #Number of nodes in network
 n_nodes=24
 
@@ -60,9 +60,6 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
     model.setObjective(gp.quicksum(gp.quicksum(Demands['Offer price'][d][t]*var_dem[d,t] for d in range(n_dem))-gp.quicksum(Generators['Bid price'][g]*var_conv_gen[g,t] for g in range(n_gen))-gp.quicksum(Wind_Farms['Bid price'][wf][t]*var_wf_gen[wf,t] for wf in range(n_wf)) for t in range(n_hour)), GRB.MAXIMIZE)
     
     #Add constraints to the model
-    # Quantity supplied = Quantity used for every time step t : no longer used in the nodal system 
-    #for t in range(n_hour):
-       # model.addConstr(gp.quicksum(var_dem[d,t] for d in range(n_dem)) - gp.quicksum(var_conv_gen[g,t] for g in range(n_gen)) - gp.quicksum(var_wf_gen[wf,t] for wf in range(n_wf)) == 0)
     # Constraint that must be fullfilled for every time ste
     for t in range(n_hour) :
         for g in range(n_gen) :
@@ -101,8 +98,8 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
             L = Nodes[n]["L"] #take the line of information corresponding to each node
             for l in L:
                 node_to, susceptance,capacity=l
-                model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to -1,t]) <=capacity) #not sure abt the syntax in this one. upper limit on capacity
-                model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to -1,t])>=-capacity) #lower limit on capacity
+                model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) <= capacity) #not sure abt the syntax in this one. upper limit on capacity
+                model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) >= -capacity) #lower limit on capacity
     #Set theta on node 1 to 0 for all t
     for t in range(n_hour):
         model.addConstr(var_theta[0,t] == 0)
@@ -115,11 +112,14 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
             D = Nodes[n]["D"] #take the line of information corresponding to each node
             G = Nodes[n]["G"] #take the line of information corresponding to each node
             W = Nodes[n]["W"] #take the line of information corresponding to each node
-
+            print(L)
+            print(len(L))
+            print(L[0][0]-1)
+            print([L[j][1] * (var_theta[n-1,t] - var_theta[L[j][0]-1,t]) for j in range(len(L))])
             model.addConstr(gp.quicksum(var_dem[d-1,t] for d in D) 
                 - gp.quicksum(var_conv_gen[g-1,t] for g in G) 
                 - gp.quicksum(var_wf_gen[wf-1,t] for wf in W) 
-                + gp.quicksum(L[j][1] * (var_theta[n-1,t] - var_theta[L[j][0]-1,t]) for j in range(len(L)-1)) == 0, name=constr_name)
+                + gp.quicksum(L[j][1]*(var_theta[n-1,t]-var_theta[L[j][0]-1,t]) for j in range(len(L))) == 0, name=constr_name)
 
     #Solve the problem
     model.optimize()
@@ -131,15 +131,17 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
         optimal_wf_gen = [[round(var_wf_gen[wf,t].X,2) for wf in range(n_wf)] for t in range(n_hour)]
         optimal_dem = [[round(var_dem[d,t].X,2) for d in range(n_dem)] for t in range(n_hour)]
         optimal_elec = [[round(var_elec[e,t].X,2) for e in range(2)] for t in range(n_hour)]
-        optimal_theta = [[round(var_theta[n-1,t].X,2) for e in range(1,25)] for t in range(n_hour)] #syntax?
+        optimal_theta = [[round(var_theta[n-1,t].X,2) for n in range(1,25)] for t in range(n_hour)] 
         equilibrium_prices = np.zeros((n_nodes, n_hour), dtype=np.float64)
-        # Value of the optimal objective
-        # Retrieve the values of the variable var_trade
-        optimal_theta = np.zeros((n_nodes,n_nodes,n_hour))
-        #for n in range(n_nodes) :
-        #   for m in range(n_nodes) :
-        #        for t in range(n_hour) :
-         #           optimal_theta[n,m,t] = round(var_theta[n,m,t].X,2) # not sure if for the nodal case it is interesting to show the values of theta
+        # Take the values of the quantity exchanged on the transmission lines 
+        quantity_trade = np.zeros((n_nodes, n_nodes, n_hour), dtype=np.float64)
+        for t in range(n_hour) :
+            for n in range(n_nodes) :
+                L = Nodes[n+1]["L"] 
+                for l in L :
+                    node_to, susceptance, capacity = l
+                    quantity_trade[n, node_to-1, t] = round(susceptance*(var_theta[n,t].X-var_theta[node_to-1,t].X),2)
+                    quantity_trade[node_to-1, n, t] = round(-susceptance*(var_theta[n,t].X-var_theta[node_to-1,t].X),2)
         # Value of the optimal objective
         optimal_obj = model.ObjVal
         
@@ -173,21 +175,21 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
     else:
         print("Optimization did not converge to an optimal solution.")
     
-    return(optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, equilibrium_prices)
+    return(optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices)
 
     
 ##########################################################
 """ Written output of transmission decision and prices """
 ##########################################################
-
-def Nodal_prices(Nodes, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices) :
+                
+def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices) :
     # Number of zones
-    n_nodes=len(Nodes)
+    n_nodes = len(Nodes)
     
     #Write output in a text file
     # Define the folder path and the file name
     folder_path = "results/nodal"
-    file_name = "Nodal prices.txt"
+    file_name = "Transmission and prices.txt"
     
     # Create the folder if it doesn't exist
     if not os.path.exists(folder_path):
@@ -198,22 +200,59 @@ def Nodal_prices(Nodes, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_e
     
     # Open the file in write mode
     with open(file_path, 'w') as file:
-        file.write("Nodal prices for the nodal optimization :")
+        file.write("Transmission and equilibrium prices for the nodal optimization :")
         file.write("\n\n")
         
         for t in range(n_hour) :
-            file.write(f"\n---------- Hour {t+1} ----------")
+            file.write(f"\n------------------------------------------------")
+            file.write(f"\n-------------------- Hour {t+1} --------------------")
             file.write("\n\n")
             
             for n in range(n_nodes) :
                 file.write(f"---------- Node {n+1} ----------\n")
-                file.write(f"Equilibrium price : {round(equilibrium_prices[n,t],2)}\n")
+                file.write(f"*Equilibrium price : {round(equilibrium_prices[n,t],2)}*\n")
                 
                 D = Nodes[n+1]["D"] #take the demand information corresponding to each node
                 G = Nodes[n+1]["G"] #take the generator information corresponding to each node
                 W = Nodes[n+1]["W"] #take the wind farm information corresponding to each node
                 Gen = round(sum([optimal_conv_gen[t][g-1] for g in G]) + sum([optimal_wf_gen[t][w-1] for w in W]),2)
+                Gen_tot = round(sum([Generators['Capacity'][g-1] for g in G]) + sum([Wind_Farms['Capacity'][w-1][t] for w in W]) - sum([optimal_elec[t][index_elec[w-1]] for w in W if w-1 in index_elec]),2)
                 Dem = round(sum([optimal_dem[t][d-1] for d in D]),2)
+                Dem_tot = round(sum([Demands["Load"][d-1][t] for d in D]),2)
+                
+                file.write(f"\nPower generation : {Gen}/{Gen_tot} MW\n")
+                for g in G :
+                    file.write(f"      {Generators['Name'][g-1]} : {optimal_conv_gen[t][g-1]}/{Generators['Capacity'][g-1]} MW\n")
+                for w in W :
+                    if w-1 in index_elec :
+                        file.write(f"      {Wind_Farms['Name'][w-1]} : {optimal_wf_gen[t][w-1]}/{round(Wind_Farms['Capacity'][w-1][t] - optimal_elec[t][index_elec[w-1]],2)} MW\n")
+                        file.write(f"          Electrolyzer : {optimal_elec[t][index_elec[w-1]]} MW\n")
+                    else :
+                        file.write(f"      {Wind_Farms['Name'][w-1]} : {optimal_wf_gen[t][w-1]}/{Wind_Farms['Capacity'][w-1][t]} MW\n")
+                file.write(f"\nPower demand : {Dem}/{Dem_tot} MW\n")
+                for d in D :
+                    if optimal_dem[t][d-1] != Demands['Load'][d-1][t] :
+                        file.write(f"      {Demands['Name'][d-1]} : {optimal_dem[t][d-1]}/{Demands['Load'][d-1][t]} MW ----> Demand not fulfilled\n")
+                    else :
+                        file.write(f"      {Demands['Name'][d-1]} : {optimal_dem[t][d-1]}/{Demands['Load'][d-1][t]} MW\n")
+                
+                file.write("\n")
+                for m in range(n_nodes) :
+                    if m+1 in [Nodes[n+1]["L"][l][0] for l in range(len(Nodes[n+1]["L"]))]:
+                        quantity = quantity_trade[n,m,t]
+                        if quantity > 0 :
+                            index_lim = next((index for index, sublist in enumerate(Nodes[n+1]["L"]) if sublist[0]==m+1), None)
+                            if quantity == Nodes[n+1]['L'][index_lim][2] :
+                                file.write(f"Transmission with node {m+1} : {quantity}/{Nodes[n+1]['L'][index_lim][2]} MW ----> Line saturated !!!\n")
+                            else :
+                                file.write(f"Transmission with node {m+1} : {quantity}/{Nodes[n+1]['L'][index_lim][2]} MW\n")
+                        else :
+                            index_lim = next((index for index, sublist in enumerate(Nodes[n+1]["L"]) if sublist[0]==m+1), None)
+                            if quantity == -Nodes[n+1]['L'][index_lim][2] :
+                                file.write(f"Transmission with node {m+1} : {quantity}/{-Nodes[n+1]['L'][index_lim][2]} MW ----> Line saturated !!!\n")
+                            else :
+                                file.write(f"Transmission with node {m+1} : {quantity}/{-Nodes[n+1]['L'][index_lim][2]} MW\n")
+                file.write("\n")
 
-optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes)
-Nodal_prices(Nodes, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices)
+optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes)
+Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)

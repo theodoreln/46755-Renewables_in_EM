@@ -122,7 +122,9 @@ Transmission = pd.DataFrame([
     columns=['Name', 'From', 'To', 'Reactance', 'Capacity'])
 
 for i in range(len(Transmission)) :
-    Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
+    # Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
+    Transmission.loc[i, 'Reactance'] = 500
+    Transmission.loc[i, 'Capacity'] = 100
     
 Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
 
@@ -195,8 +197,8 @@ for j in range(len(Transmission)) :
     node_to = Transmission['To'][j]
     susceptance = 500
     # susceptance = Transmission['Susceptance'][j]
-    # capacity = 100
-    capacity = Transmission['Capacity'][j]
+    capacity = 100
+    # capacity = Transmission['Capacity'][j]
     Nodes[node_from]["L"].append([node_to, susceptance, capacity])
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     

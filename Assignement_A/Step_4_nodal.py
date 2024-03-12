@@ -27,7 +27,7 @@ n_nodes=24
 
 
 # Taking the hour supply and load information and optimizing on 24 hours
-def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
+def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
     # Global variables
     # global optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec
     #Number of units to take into account (based on data)
@@ -46,15 +46,15 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
     model = gp.Model()
     #Initialize the decision variables, each one of them is now time dependant
     # Capacities provided by conventional generation units
-    var_conv_gen = model.addVars(n_gen, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='conv_gen')
+    var_conv_gen = model.addVars(n_gen, n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='conv_gen')
     # Capacities provided by wind farms
-    var_wf_gen = model.addVars(n_wf, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='wf_gen')
+    var_wf_gen = model.addVars(n_wf, n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='wf_gen')
     # Demand capacities fullfilled
-    var_dem = model.addVars(n_dem, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='dem')
+    var_dem = model.addVars(n_dem, n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='dem')
     # Capacities provided to the electrolyzer
-    var_elec = model.addVars(len(index_elec), n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='elec')
+    var_elec = model.addVars(len(index_elec), n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='elec')
     #Load angle for each node
-    var_theta = model.addVars(n_nodes, n_hour, lb=-3.14159, ub=3.14159, vtype=GRB.CONTINUOUS, name='Theta')
+    var_theta = model.addVars(n_nodes, n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='Theta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
     model.setObjective(gp.quicksum(gp.quicksum(Demands['Offer price'][d][t]*var_dem[d,t] for d in range(n_dem))-gp.quicksum(Generators['Bid price'][g]*var_conv_gen[g,t] for g in range(n_gen))-gp.quicksum(Wind_Farms['Bid price'][wf][t]*var_wf_gen[wf,t] for wf in range(n_wf)) for t in range(n_hour)), GRB.MAXIMIZE)
@@ -64,8 +64,9 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
     for t in range(n_hour) :
         for g in range(n_gen) :
             # The provided capacity of a conventional unit should not be more than the maximum capacity
-            model.addConstr(var_conv_gen[g,t] <= Generators['Capacity'][g])
-            model.addConstr(var_conv_gen[g,t] >= 0)
+            name = f"Generator {g+1} : dual "
+            model.addConstr(var_conv_gen[g,t] <= Generators['Capacity'][g], name=name+'up ')
+            model.addConstr(var_conv_gen[g,t] >= 0, name=name+'down ')
             # Ramp up and ramp down constraints of conventional units depends on the time step, for t=1 take into account initial power
             if t != 0 :
                 model.addConstr(var_conv_gen[g,t] - var_conv_gen[g,t-1] <= Generators['Ramp up'][g])
@@ -94,12 +95,21 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
         
     #Constraint on line capacity. Must be fulfilled for each time and for each line
     for t in range(n_hour):
-        for n in range(1,25):
-            L = Nodes[n]["L"] #take the line of information corresponding to each node
-            for l in L:
-                node_to, susceptance,capacity=l
-                model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) <= capacity) #not sure abt the syntax in this one. upper limit on capacity
-                model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) >= -capacity) #lower limit on capacity
+        # for n in range(1,25):
+        #     L = Nodes[n]["L"] #take the line of information corresponding to each node
+        #     for l in L:
+        #         node_to, susceptance,capacity=l
+        #         name = f'dual {t+1}, {n}, {node_to} '
+        #         model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) <= capacity, name=name+'up') #not sure abt the syntax in this one. upper limit on capacity
+        #         model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) >= -capacity, name=name+'down') #lower limit on capacity
+        # Another version of the code above for the transmission constraints
+        for tr in range(len(Transmission)) :
+            nf, nt, sus, cap = Transmission['From'][tr], Transmission['To'][tr], Transmission['Susceptance'][tr], Transmission['Capacity'][tr]
+            print(nf,nt,sus,cap)
+            name = f'dual {t+1}, {nf}, {nt} '
+            model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) <= cap, name=name+'up')
+            model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) >= -cap, name=name+'down')
+            
     #Set theta on node 1 to 0 for all t
     for t in range(n_hour):
         model.addConstr(var_theta[0,t] == 0)
@@ -112,10 +122,8 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes) :
             D = Nodes[n]["D"] #take the line of information corresponding to each node
             G = Nodes[n]["G"] #take the line of information corresponding to each node
             W = Nodes[n]["W"] #take the line of information corresponding to each node
-            print(L)
-            print(len(L))
-            print(L[0][0]-1)
-            print([L[j][1] * (var_theta[n-1,t] - var_theta[L[j][0]-1,t]) for j in range(len(L))])
+            for j in range(len(L)) :
+                print(n, L[j][0], L[j][1], L[j][2])
             model.addConstr(gp.quicksum(var_dem[d-1,t] for d in D) 
                 - gp.quicksum(var_conv_gen[g-1,t] for g in G) 
                 - gp.quicksum(var_wf_gen[wf-1,t] for wf in W) 
@@ -254,5 +262,5 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
                                 file.write(f"Transmission with node {m+1} : {quantity}/{-Nodes[n+1]['L'][index_lim][2]} MW\n")
                 file.write("\n")
 
-optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes)
+optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission)
 Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)

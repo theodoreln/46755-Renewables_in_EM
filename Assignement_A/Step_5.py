@@ -52,8 +52,8 @@ for name in DA_gen['Name']:
     if name in WF_higher:
         DA_gen.loc[DA_gen['Name'] == name, 'Production'] *= 1.15
 
-#Generation - Demand imbalance
-Dp = DA_gen['Production'].sum() - sum(DA_dem0)
+#total imbalance  
+Dp = sum(DA_dem0) - DA_gen['Production'].sum()
 
 #Creating new dataframe where only the generators that are elidgible for balancing are included, alongside their remaining capacities
 #and their day ahead prices
@@ -107,7 +107,7 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
     # Add the objective function to the model
     model.setObjective(gp.quicksum(Generators_up['Bid price'][i]*var_gen_up[i] for i in range(n_gen_up-1)) + Generators_up['Bid price'].iloc[-1]*var_gen_up.select()[-1] - gp.quicksum(Generators_dw['Bid price'][i]*var_gen_dw[i] for i in range(n_gen_dw)) , GRB.MINIMIZE)
     #Constraint about power balance
-    model.addConstr(gp.quicksum(var_gen_up[i] for i in range(n_gen_up)) - gp.quicksum(var_gen_dw[i] for i in range(n_gen_dw)) == -Imbalance, name='Power balance')
+    model.addConstr(gp.quicksum(var_gen_up[i] for i in range(n_gen_up)) - gp.quicksum(var_gen_dw[i] for i in range(n_gen_dw)) == Imbalance, name='Power balance')
     # Quantities supplied can't be higher than maximum quantities
     for i in range(n_gen_up) :
         name_constr = f"{Generators_up['Name'][i]}_uplim_{i}"
@@ -209,8 +209,7 @@ for name in BM_clearing['Name'].values:
 
 
 #distinquishing between energy deficit and surplus imbalances
-if Dp < 0:
-    #
+if Dp > 0:
     for index, row in BM_clearing.iterrows():
         BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
         #for dual price we need to distinquish whether individual imbalances have a positive or negative impact so to apply either DA or 

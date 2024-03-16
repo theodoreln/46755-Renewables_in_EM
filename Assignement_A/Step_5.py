@@ -11,7 +11,7 @@ import os
 GRB = gp.GRB
 
 # Select only one hour
-hour = 15
+hour = 10
 for i in range(len(Demands)) :
     Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
     Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
@@ -36,11 +36,12 @@ BM_clearing = DA_gen[['Name','Production']].copy()
 #Conventional generetor that fails
 CG_outage = ['Generator 9']
 
-#Wind farms with lower produsction
+#Wind farms with lower production
 WF_lower = ['Wind farm 1', 'Wind farm 2', 'Wind farm 3']
 
 #Wind farms with higher production
 WF_higher = ['Wind farm 4', 'Wind farm 5', 'Wind farm 6']
+
 
 #Implementing changes of pruduction to wind farms and setting production of convntional generators that failed to 0
 for name in DA_gen['Name']:
@@ -69,17 +70,9 @@ for name in Balancing_gen['Name']:
 
 #Generators that can provide up regulation
 Balancing_gen_up = Balancing_gen.copy()
-Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Capacity'] != Balancing_gen_up['Production']]
+Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Capacity'] != Balancing_gen_up['Production']] 
 Balancing_gen_up['Capacity'] = Balancing_gen_up['Capacity'] - Balancing_gen_up['Production']
 Balancing_gen_up = Balancing_gen_up.drop('Production', axis=1)
-
-if Dp < 0:
-    curtailment = pd.DataFrame({'Name': 'Curtailment', 'Capacity': -Dp, 'Bid price': 400.0}, index=[0])
-    Balancing_gen_up = pd.concat([Balancing_gen_up, curtailment], axis=0) 
-
-#reseting the indexes
-Balancing_gen_up.reset_index(drop=True, inplace=True)
-
 
 #Generators that can provide down regulation
 Balancing_gen_dw = Balancing_gen.copy()
@@ -87,6 +80,16 @@ Balancing_gen_dw = Balancing_gen_dw[Balancing_gen_dw['Production'] != 0]
 Balancing_gen_dw['Capacity'] = Balancing_gen_dw['Production']
 Balancing_gen_dw = Balancing_gen_dw.drop('Production', axis=1)
 Balancing_gen_dw.reset_index(drop=True, inplace=True)
+
+#implementing the changes on the bidding price
+Balancing_gen_up['Bid price'] *= 1.1
+Balancing_gen_dw['Bid price'] *= 0.87
+
+#adding curtailment to available generators for up regulation
+curtailment = pd.DataFrame({'Name': 'Curtailment', 'Capacity': sum(DA_dem0), 'Bid price': 400.0}, index=[0])
+Balancing_gen_up = pd.concat([Balancing_gen_up, curtailment], axis=0) 
+#reseting the indexes
+Balancing_gen_up.reset_index(drop=True, inplace=True)
 
 def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
     # Global variables
@@ -102,7 +105,7 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
     var_gen_up = model.addVars(n_gen_up, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='gen_up')
     var_gen_dw = model.addVars(n_gen_dw, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='gen_dw')
     # Add the objective function to the model
-    model.setObjective(gp.quicksum(Generators_up['Bid price'][i]*1.1*var_gen_up[i] for i in range(n_gen_up-1)) + Generators_up['Bid price'].iloc[-1]*0.87*var_gen_up.select()[-1] - gp.quicksum(Generators_dw['Bid price'][i]*var_gen_dw[i] for i in range(n_gen_dw)) , GRB.MINIMIZE)
+    model.setObjective(gp.quicksum(Generators_up['Bid price'][i]*var_gen_up[i] for i in range(n_gen_up-1)) + Generators_up['Bid price'].iloc[-1]*var_gen_up.select()[-1] - gp.quicksum(Generators_dw['Bid price'][i]*var_gen_dw[i] for i in range(n_gen_dw)) , GRB.MINIMIZE)
     #Constraint about power balance
     model.addConstr(gp.quicksum(var_gen_up[i] for i in range(n_gen_up)) - gp.quicksum(var_gen_dw[i] for i in range(n_gen_dw)) == -Imbalance, name='Power balance')
     # Quantities supplied can't be higher than maximum quantities

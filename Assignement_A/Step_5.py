@@ -82,8 +82,8 @@ Balancing_gen_dw = Balancing_gen_dw.drop('Production', axis=1)
 Balancing_gen_dw.reset_index(drop=True, inplace=True)
 
 #implementing the changes on the bidding price
-Balancing_gen_up['Bid price'] *= 1.1
-Balancing_gen_dw['Bid price'] *= 0.87
+Balancing_gen_up['Bid price'] = Balancing_gen_up['Bid price']*0.1 + DA_price
+Balancing_gen_dw['Bid price'] = DA_price - Balancing_gen_dw['Bid price']*0.13
 
 #adding curtailment to available generators for up regulation
 curtailment = pd.DataFrame({'Name': 'Curtailment', 'Capacity': sum(DA_dem0), 'Bid price': 400.0}, index=[0])

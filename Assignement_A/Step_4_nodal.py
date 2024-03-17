@@ -1,5 +1,5 @@
 
-from Data import Generators, Demands, Wind_Farms, Transmission, Nodes
+from Data import Generators, Demands, Wind_Farms, Transmission, Nodes, Line_susceptance, Line_capacity
 from Step_1 import Single_hour_plot, Commodities
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,7 +54,7 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
     # Capacities provided to the electrolyzer
     var_elec = model.addVars(len(index_elec), n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='elec')
     #Load angle for each node
-    var_theta = model.addVars(n_nodes, n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='Theta')
+    var_theta = model.addVars(n_nodes, n_hour, lb=-3.14, ub=3.14, vtype=GRB.CONTINUOUS, name='Theta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
     model.setObjective(gp.quicksum(gp.quicksum(Demands['Offer price'][d][t]*var_dem[d,t] for d in range(n_dem))-gp.quicksum(Generators['Bid price'][g]*var_conv_gen[g,t] for g in range(n_gen))-gp.quicksum(Wind_Farms['Bid price'][wf][t]*var_wf_gen[wf,t] for wf in range(n_wf)) for t in range(n_hour)), GRB.MAXIMIZE)
@@ -103,12 +103,18 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
         #         model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) <= capacity, name=name+'up') #not sure abt the syntax in this one. upper limit on capacity
         #         model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) >= -capacity, name=name+'down') #lower limit on capacity
         # Another version of the code above for the transmission constraints
-        for tr in range(len(Transmission)) :
-            nf, nt, sus, cap = Transmission['From'][tr], Transmission['To'][tr], Transmission['Susceptance'][tr], Transmission['Capacity'][tr]
-            print(nf,nt,sus,cap)
-            name = f'dual {t+1}, {nf}, {nt} '
-            model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) <= cap, name=name+'up')
-            model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) >= -cap, name=name+'down')
+        # for tr in range(len(Transmission)) :
+        #     nf, nt, sus, cap = Transmission['From'][tr], Transmission['To'][tr], Transmission['Susceptance'][tr], Transmission['Capacity'][tr]
+        #     print(nf,nt,sus,cap)
+        #     name = f'dual {t+1}, {nf}, {nt} '
+        #     model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) <= cap, name=name+'up')
+        #     model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) >= -cap, name=name+'down')
+        # Version with dataframe
+        for n in range(24) :
+            for m in range(24) :
+                name = f'dual {t+1}, {n+1}, {m+1} '
+                model.addConstr(Line_susceptance[n,m]*(var_theta[n,t]-var_theta[m,t]) <= Line_capacity[n,m], name=name+'up')
+                model.addConstr(Line_susceptance[n,m]*(var_theta[n,t]-var_theta[m,t]) >= -Line_capacity[n,m], name=name+'down')
             
     #Set theta on node 1 to 0 for all t
     for t in range(n_hour):
@@ -122,12 +128,13 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
             D = Nodes[n]["D"] #take the line of information corresponding to each node
             G = Nodes[n]["G"] #take the line of information corresponding to each node
             W = Nodes[n]["W"] #take the line of information corresponding to each node
-            for j in range(len(L)) :
-                print(n, L[j][0], L[j][1], L[j][2])
+            # for j in range(len(L)) :
+            #     print(n, L[j][0], L[j][1], L[j][2])
+                
             model.addConstr(gp.quicksum(var_dem[d-1,t] for d in D) 
                 - gp.quicksum(var_conv_gen[g-1,t] for g in G) 
                 - gp.quicksum(var_wf_gen[wf-1,t] for wf in W) 
-                + gp.quicksum(L[j][1]*(var_theta[n-1,t]-var_theta[L[j][0]-1,t]) for j in range(len(L))) == 0, name=constr_name)
+                + gp.quicksum(Line_susceptance[n-1,m]*(var_theta[n-1,t]-var_theta[m,t]) for m in range(24)) == 0, name=constr_name)
 
     #Solve the problem
     model.optimize()

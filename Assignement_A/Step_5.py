@@ -43,7 +43,7 @@ WF_lower = ['Wind farm 1', 'Wind farm 2', 'Wind farm 3']
 WF_higher = ['Wind farm 4', 'Wind farm 5', 'Wind farm 6']
 
 
-#Implementing changes of pruduction to wind farms and setting production of convntional generators that failed to 0
+#Implementing changes of production to wind farms and setting production of convntional generators that failed to 0
 for name in DA_gen['Name']:
     if name in CG_outage:
         DA_gen.loc[DA_gen['Name'] == name, 'Production'] = 0.0
@@ -85,7 +85,7 @@ Balancing_gen_dw.reset_index(drop=True, inplace=True)
 Balancing_gen_up['Bid price'] = Balancing_gen_up['Bid price']*0.1 + DA_price
 Balancing_gen_dw['Bid price'] = DA_price - Balancing_gen_dw['Bid price']*0.13
 
-#adding curtailment to available generators for up regulation
+#adding curtailment to available demands for up regulation
 curtailment = pd.DataFrame({'Name': 'Curtailment', 'Capacity': sum(DA_dem0), 'Bid price': 400.0}, index=[0])
 Balancing_gen_up = pd.concat([Balancing_gen_up, curtailment], axis=0) 
 #reseting the indexes
@@ -165,7 +165,7 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
                     balancing_price = c.Pi
                     
         print("\n")
-        print(f"Equilibrium price : {balancing_price} $/MWh")
+        print(f"Equilibrium price : {round(balancing_price,3)} $/MWh\n")
 
     else:
         print("Optimization did not converge to an optimal solution.")
@@ -189,6 +189,7 @@ BM_clearing.rename(columns={'Production': 'DA_production'}, inplace=True)
 BM_clearing['Imbalance'] = [0] * len(BM_clearing)
 BM_clearing['BM_up'] = [0] * len(BM_clearing)
 BM_clearing['BM_dw'] = [0] * len(BM_clearing)
+BM_clearing['DA_wo_BM'] = [0] * len(BM_clearing)
 BM_clearing['single-price'] = [0] * len(BM_clearing)
 BM_clearing['dual-price'] = [0] * len(BM_clearing)
 
@@ -211,26 +212,96 @@ for name in BM_clearing['Name'].values:
 #distinquishing between energy deficit and surplus imbalances
 if Dp > 0:
     for index, row in BM_clearing.iterrows():
-        BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
+        BM_clearing.loc[index, 'DA_wo_BM'] = row['DA_production']*DA_price
+        BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price 
         #for dual price we need to distinquish whether individual imbalances have a positive or negative impact so to apply either DA or 
         # balancing price, conventional generator outages can be implemented here since always balancing price is applied 
         if row['Imbalance'] > 0:
-            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*DA_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
+            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*DA_price + row['BM_up']*BM_price 
         else:
-            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
+            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price
 else:
     for index, row in BM_clearing.iterrows():
+        BM_clearing.loc[index, 'DA_wo_BM'] = row['DA_production']*DA_price
         #we need to distinquish for the  outage of conventional genrators since they always need to pay when they fail to deliver
         if row['Name'] in CG_outage:
             BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price 
         else:
-            #the negative sign on the 'imbalance' just reverses the farm imbalances because now the total ibalance is positive,
-            #so positive individual imbalances actually impede the system and the other way around
-            BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price - row['Imbalance']*BM_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
-            if row['Imbalance'] > 0:
-                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price - row['Imbalance']*DA_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
+            BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price - row['BM_dw']*BM_price
+            if row['Imbalance'] < 0:
+                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*DA_price - row['BM_dw']*BM_price
             else:
-                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price - row['Imbalance']*BM_price + row['BM_up']*BM_price + row['BM_dw']*BM_price
+                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price - row['BM_dw']*BM_price
 
 
 print(BM_clearing)
+
+
+# Plotting the solution of the clearing for an hour and demands and generators entries
+def Balancing_plot(hour, Balancing_gen_dw, Balancing_gen_up, Dp, BM_price) :
+    # Size of the figure
+    plt.figure(figsize = (20, 12))
+    plt.rcParams["font.size"] = 16
+    
+    # Positions of the generation units bars
+    x_dw, y_dw, w_dw = [],[],[]
+    x_up, y_up, w_up = [],[],[]
+    max_down = Balancing_gen_dw['Capacity'].sum()
+    xpos = -max_down
+    for i in range(len(Balancing_gen_dw)) :
+        x_dw.append(xpos)
+        y_dw.append(-Balancing_gen_dw['Bid price'][i])
+        w_dw.append(Balancing_gen_dw['Capacity'][i])
+        xpos += Balancing_gen_dw['Capacity'][i]
+    for i in range(len(Balancing_gen_up)) :
+        x_dw.append(xpos)
+        y_dw.append(Balancing_gen_up['Bid price'][i])
+        w_dw.append(Balancing_gen_up['Capacity'][i])
+        xpos += Balancing_gen_up['Capacity'][i]
+    
+    # Names of the generators
+    name_dw = Balancing_gen_dw['Name'].tolist()
+    name_up = Balancing_gen_up['Name'].tolist()
+    names = name_dw + name_up 
+    # names = list(set(names))
+    
+    # Concatenate all bars
+    x = x_dw + x_up
+    y = y_dw + y_up
+    w = w_dw + w_up
+        
+    # Different colors for each suppliers
+    colors = sns.color_palette('flare', len(x))
+    
+    # Plot the bar for the supply
+    fig_bar = plt.bar(x, 
+            height = y,
+            width = w,
+            fill = True,
+            color = colors,
+            align = 'edge')
+    
+    # Legend with name of suppliers
+    plt.legend(fig_bar.patches, names,
+              loc = "best",
+              ncol = 3)
+    
+    # Balance need
+    plt.vlines(x = Dp, ymin=-100, ymax=100,
+                color = "red",
+                linestyle = "dashed")
+    
+    # Limit of the figure
+    plt.xlim(-max_down*1.1, Balancing_gen_up['Capacity'].sum()*1.1)
+    plt.ylim(-Balancing_gen_dw['Bid price'].max()*1.1, Balancing_gen_up['Bid price'].max()*1.1)
+
+    plt.xlabel("Quantity (MW)")
+    plt.ylabel("Bid price ($/MWh)")
+    # plt.title(Title)
+    output_folder = os.path.join(os.getcwd(), 'plots')
+    pdf_name = f'Balancing market in hour {hour}'+'.pdf'
+    pdf_filename = os.path.join(output_folder, pdf_name)
+    plt.savefig(pdf_filename,  bbox_inches='tight')
+    plt.show()
+    
+Balancing_plot(hour, Balancing_gen_dw, Balancing_gen_up, Dp, BM_price)

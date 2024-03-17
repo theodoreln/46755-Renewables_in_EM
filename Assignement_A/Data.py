@@ -50,6 +50,13 @@ Generators = pd.DataFrame([
     ['Generator 12', 23, 350, 240, 240, 280, 10.89]],
     columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Initial power', 'Bid price'])
 
+Generators_reserve = Generators.copy()
+
+Generators_reserve['Maximum up reserve'] = [40, 40, 70, 180, 60, 30, 30, 0, 0, 0, 60, 40]
+Generators_reserve['Maximum down reserve'] = [40, 40, 70, 180, 60, 30, 30, 0, 0, 0, 60, 40]
+Generators_reserve['Up reserve price'] = [15, 15, 10, 8, 7, 16, 16, 0, 0, 0, 17, 16]
+Generators_reserve['Down reserve price'] = [14, 14, 9, 7, 5, 14, 14, 0, 0, 0, 16, 14]
+
 
 #########################################
 """ Import values of the demand units """
@@ -121,10 +128,19 @@ Transmission = pd.DataFrame([
     ['Line 31',18, 21, 0.0132, 1000], ['Line 32',19, 20, 0.0203, 1000], ['Line 33',20, 23, 0.0112, 1000], ['Line 34',21, 22, 0.0692, 500]],
     columns=['Name', 'From', 'To', 'Reactance', 'Capacity'])
 
+Line_susceptance = np.zeros((24,24))
+Line_capacity = np.zeros((24,24))
 for i in range(len(Transmission)) :
-    # Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
+    Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
     Transmission.loc[i, 'Reactance'] = 500
-    Transmission.loc[i, 'Capacity'] = 100
+    Transmission.loc[i, 'Capacity'] = 400
+    t = Transmission.iloc[i].tolist()
+    name, idf, idt, sus, cap = t
+    Line_susceptance[idf-1,idt-1] = sus
+    Line_susceptance[idt-1,idf-1] = sus
+    Line_capacity[idf-1,idt-1] = cap
+    Line_capacity[idt-1,idf-1] = cap
+    
     
 Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
 
@@ -195,10 +211,8 @@ for j in range(len(Wind_Farms)) :
 for j in range(len(Transmission)) :
     node_from = Transmission['From'][j]
     node_to = Transmission['To'][j]
-    susceptance = 500
-    # susceptance = Transmission['Susceptance'][j]
-    capacity = 100
-    # capacity = Transmission['Capacity'][j]
+    susceptance = Transmission['Susceptance'][j]
+    capacity = Transmission['Capacity'][j]
     Nodes[node_from]["L"].append([node_to, susceptance, capacity])
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     

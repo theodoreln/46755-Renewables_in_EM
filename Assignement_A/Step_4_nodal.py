@@ -8,6 +8,7 @@ import pandas as pd
 import gurobipy as gp
 import copy
 import os
+from math import pi
 GRB = gp.GRB
 
 
@@ -54,7 +55,7 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
     # Capacities provided to the electrolyzer
     var_elec = model.addVars(len(index_elec), n_hour, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='elec')
     #Load angle for each node
-    var_theta = model.addVars(n_nodes, n_hour, lb=-3.14, ub=3.14, vtype=GRB.CONTINUOUS, name='Theta')
+    var_theta = model.addVars(n_nodes, n_hour, lb=-pi, ub=pi, vtype=GRB.CONTINUOUS, name='Theta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
     model.setObjective(gp.quicksum(gp.quicksum(Demands['Offer price'][d][t]*var_dem[d,t] for d in range(n_dem))-gp.quicksum(Generators['Bid price'][g]*var_conv_gen[g,t] for g in range(n_gen))-gp.quicksum(Wind_Farms['Bid price'][wf][t]*var_wf_gen[wf,t] for wf in range(n_wf)) for t in range(n_hour)), GRB.MAXIMIZE)
@@ -271,3 +272,70 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
 
 optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission)
 Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
+
+
+
+node_prices = [equilibrium_prices[0,:].tolist()]  # Change the index to match the desired node number
+
+#change the transmission capacity
+Line_capacity[15-1, 21-1] = 400
+Line_capacity[21-1, 15-1] = 400
+Line_capacity[14-1, 16-1] = 250
+Line_capacity[16-1, 14-1] = 250
+Line_capacity[13-1, 23-1] = 250
+Line_capacity[23-1, 13-1] = 250
+
+#run again the function to get equilibrium price. Comment next line to obtain Objective value for non-constrained model
+optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission)
+Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
+
+
+#store the prices of the nodes that I want 
+node_prices.append(equilibrium_prices[7,:].tolist())  # Node 21 (adjusted index)
+node_prices.append(equilibrium_prices[14,:].tolist())  # Node 15 (adjusted index)
+node_prices.append(equilibrium_prices[20,:].tolist())  # Node 21 (adjusted index)
+
+node_numbers = [1,8, 15, 21]  # Node numbers corresponding to each sublist
+
+
+
+def plot_congested1_nodal(node_prices, node_numbers, save_path=None):
+    fig, ax1 = plt.subplots(figsize=(20, 12))
+    plt.rcParams["font.size"] = 16
+    
+    # Set x-axis limits and ticks
+    hours = np.arange(1, 25)
+    
+    list_names=['Non-congested', 'Node 8', 'Node 15', 'Node 21']
+    
+    # Plot step line for node prices
+    for i, prices in enumerate(node_prices):
+        ax1.step(hours, prices, where='post', linestyle='-',linewidth=2.5, label=list_names[i])
+    
+    # Set x and y axis label
+    ax1.set_xlabel('Hours')
+    ax1.set_ylabel('Nodal Market Price ($/MWh)')
+    ax1.legend(loc='upper left')
+    
+    # Save the plot as an image if save_path is provided
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+
+# Define the path where you want to save the plot
+folder_path = "plots/step4_nodal"
+file_name = "congested1_plot.png"
+save_path = os.path.join(folder_path, file_name)
+
+# Create the folder if it doesn't exist
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)
+
+# Plot the equilibrium prices for all nodes and save the plot as an image
+plot_congested1_nodal(node_prices, node_numbers, save_path=save_path)
+
+# Call the function to write equilibrium prices to a file
+#Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)

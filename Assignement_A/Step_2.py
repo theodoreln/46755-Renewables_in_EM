@@ -21,7 +21,7 @@ n_hour = 24
 # Index of the electrolyzer, change first numbers to change the place
 index_elec = {0:0, 1:1}
 # Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 20
+Hydro_demand = 0
 
 
 # Taking the hour supply and load information and optimizing on 24 hours
@@ -166,12 +166,6 @@ def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen
     optimal_dem_hour = Demands_hour['Optimal'].to_list()
     return(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
 
-# Trying for only one hour    
-# optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
-# Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, 6)
-# Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
-# clearing_price = Single_hour_price(Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour)
-# Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
 
 #####################################################
 """ Visualize wind farm and electrolyzer capacity"""
@@ -217,7 +211,7 @@ def plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total):
     ax2 = ax1.twinx()
     ax2.set_ylim(0, 2700)
     ax2.plot(hours, Demand_total['Demand'], color='darkgreen', linestyle='-', marker='o', label='Total demand')
-    ax2.set_ylabel('total demand (MW)')
+    ax2.set_ylabel('Demand [MW]')
     
     # Legend for second x axis
     ax2.legend(loc='upper right')
@@ -228,8 +222,8 @@ def plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total):
     ax1.set_xticks(np.arange(1, 25, step=1))
     
     # x and y axis label
-    ax1.set_xlabel('hours')
-    ax1.set_ylabel('capacity (MW)')
+    ax1.set_xlabel('Hours')
+    ax1.set_ylabel('Capacity [MW]')
     ax1.legend(loc='upper left')
     
     plt.show()
@@ -263,13 +257,16 @@ def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     final_dataframe.to_excel('output_file.xlsx', index=False)
         
     return(Electrolizer_1, Electrolizer_2, Demand_total)
-        
-Electrolizer_1, Electrolizer_2, Demand_total = Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
-plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total)
 
 
-    
-
+if __name__ == "__main__":     
+    Electrolizer_1, Electrolizer_2, Demand_total = Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
+    plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total)
+    # Trying for only one hour    
+    # optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
+    # Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, 6)
+    # Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
+    # Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
 
 
 

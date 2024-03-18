@@ -197,9 +197,10 @@ def Single_hour_price(Generators, Demands, optimal_gen, optimal_dem) :
 def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_dem, Title) :
     # Size of the figure
     plt.figure(figsize = (20, 12))
-    plt.rcParams["font.size"] = 16
+    plt.rcParams["font.size"] = 20
     
     # Positions of the generation units bars
+    Gen_conv, Gen_constr, Gen_not = [], [], []
     xpos_wf, y_wf, w_wf = [],[],[]
     xpos_conv, y_conv, w_conv = [],[],[]
     xpos_constr, y_constr, w_constr = [],[],[]
@@ -212,12 +213,15 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
             xpos_wf.append(xpos)
             y_wf.append(Generators['Bid price'][i])
             w_wf.append(optimal_gen[i])
+            Gen_conv.append(Generators['Name'][i])
             xpos += optimal_gen[i]
         else :
             if optimal_gen[i] == 0 :
                 xpos_not.append(xpos)
                 y_not.append(Generators['Bid price'][i])
                 w_not.append(Generators['Capacity'][i])
+                if Generators['Name'][i] not in Gen_conv+Gen_constr :
+                    Gen_not.append(Generators['Name'][i])
                 if x_not_select == -1 :
                     x_not_select = xpos
                     price_last_selected = Generators['Bid price'][i-1]
@@ -227,12 +231,15 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                     xpos_conv.append(xpos)
                     y_conv.append(Generators['Bid price'][i])
                     w_conv.append(optimal_gen[i])
+                    Gen_conv.append(Generators['Name'][i])
                     if optimal_gen[i] == Generators['Capacity'][i] :
                         xpos += optimal_gen[i]
                     else :
                         xpos_not.append(xpos+optimal_gen[i])
                         y_not.append(Generators['Bid price'][i])
                         w_not.append(Generators['Capacity'][i] - optimal_gen[i])
+                        if Generators['Name'][i] not in Gen_conv+Gen_constr :
+                            Gen_not.append(Generators['Name'][i])
                         x_not_select = xpos + optimal_gen[i]
                         xpos += Generators['Capacity'][i]
                         price_last_selected = Generators['Bid price'][i]
@@ -240,6 +247,7 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                     xpos_conv.append(x_not_select)
                     y_conv.append(Generators['Bid price'][i])
                     w_conv.append(optimal_gen[i])
+                    Gen_conv.append(Generators['Name'][i])
                     for j in range(len(xpos_not)) :
                         xpos_not[j] += optimal_gen[i]
                     x_not_select += optimal_gen[i]
@@ -248,11 +256,14 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                         xpos_not.append(xpos)
                         y_not.append(Generators['Bid price'][i])
                         w_not.append(Generators['Capacity'][i] - optimal_gen[i])
+                        if Generators['Name'][i] not in Gen_conv+Gen_constr :
+                            Gen_not.append(Generators['Name'][i])
                         xpos += Generators['Capacity'][i] - optimal_gen[i]
                 else :
                     xpos_constr.append(x_not_select)
                     y_constr.append(Generators['Bid price'][i])
                     w_constr.append(optimal_gen[i])
+                    Gen_constr.append(Generators['Name'][i])
                     for j in range(len(xpos_not)) :
                         xpos_not[j] += optimal_gen[i]
                     x_not_select += optimal_gen[i]
@@ -261,11 +272,14 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                         xpos_not.append(xpos)
                         y_not.append(Generators['Bid price'][i])
                         w_not.append(Generators['Capacity'][i] - optimal_gen[i])
+                        if Generators['Name'][i] not in Gen_conv+Gen_constr :
+                            Gen_not.append(Generators['Name'][i])
                         xpos += Generators['Capacity'][i] - optimal_gen[i]
     # Different colors for each suppliers
     colors = sns.color_palette('flare', len(xpos_wf)+len(xpos_conv))
     col_wf = colors[:len(xpos_wf)]
     col_conv = colors[len(xpos_conv):]
+    Generators_name = Gen_conv + Gen_constr + Gen_not
     # Plot the bar for the supply
     fig_wf = plt.bar(xpos_wf, 
             height = y_wf,
@@ -296,7 +310,7 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
             alpha = 0.5)
     
     # Legend with name of suppliers
-    plt.legend(fig_wf.patches+fig_conv.patches+fig_constr.patches+fig_not.patches, Generators["Name"].values.tolist(),
+    plt.legend(fig_wf.patches+fig_conv.patches+fig_constr.patches+fig_not.patches, Generators_name,
               loc = "best",
               ncol = 3)
     
@@ -331,7 +345,7 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
                 ma = 'right',
                 s = f"Electricity price: {clearing_price} $/MWh\n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
     else :
-        plt.text(x = sum(optimal_gen) - 1000 ,
+        plt.text(x = sum(optimal_gen) - 1400 ,
                 y = clearing_price + 2 ,
                 ma = 'right',
                 s = f"Electricity price: {clearing_price} $/MWh\n Quantity : " + str(round(sum(optimal_dem),2)) + " MW")
@@ -341,8 +355,8 @@ def Single_hour_plot(Generators, Demands, clearing_price, optimal_gen, optimal_d
     plt.xlim(0,4200)
     plt.ylim(0, max(Generators["Bid price"].max(),Demands["Offer price"].max()) + 10)
 
-    plt.xlabel("Power plant capacity (MW)")
-    plt.ylabel("Bid price ($/MWh)")
+    plt.xlabel("Quantity [MW]")
+    plt.ylabel("Bid price [$/MWh]")
     # plt.title(Title)
     output_folder = os.path.join(os.getcwd(), 'plots')
     pdf_name = Title+'.pdf'

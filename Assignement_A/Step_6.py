@@ -1,5 +1,6 @@
 from Data import Generators, Generators_reserve, Demands, Wind_Farms
 from Step_1 import Single_hour_plot, Commodities, Single_hour_optimization
+from Step_2 import Multiple_hour_optimization, Select_one_hour, Right_order, Copper_plate_multi_hour
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -112,8 +113,6 @@ def Reserve_optimization(Generators_reserve, Demands) :
     
     return(optimal_up, optimal_down, up_prices, down_prices)
 
-optimal_up, optimal_down, up_prices, down_prices = Reserve_optimization(Generators_reserve, Demands)
-
 
 # Optimization problem for the day-ahead problem
 def DA_optimization(Generators, Wind_Farms, Demands, optimal_up, optimal_down) :
@@ -222,10 +221,197 @@ def DA_optimization(Generators, Wind_Farms, Demands, optimal_up, optimal_down) :
     
     return(optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices)
 
-
+optimal_up, optimal_down, up_prices, down_prices = Reserve_optimization(Generators_reserve, Demands)
 optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices = DA_optimization(Generators, Wind_Farms, Demands, optimal_up, optimal_down)
 
 
 
+########################
+""" Results analysis """
+########################
 
+# Function to put all results on a text file 
+def Results_reserve(Generators_reserve, Wind_Farms, Demands, optimal_up, optimal_down, up_prices, down_prices, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices) :
+    #Write output in a text file
+    # Define the folder path and the file name
+    folder_path = "results/reserve"
+    file_name = "Capacity reserved and results of the day-ahead market.txt"
+    
+    # Create the folder if it doesn't exist
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    # Combine the folder path and file name
+    file_path = os.path.join(folder_path, file_name)
+    
+    # Open the file in write mode
+    with open(file_path, 'w') as file:
+        file.write("Capacity reserved and results of the day-ahead market :")
+        file.write("\n\n")
+        
+        for t in range(n_hour) :
+            file.write(f"\n------------------------------------------------")
+            file.write(f"\n-------------------- Hour {t+1} --------------------")
+            file.write("\n\n")
+            
+            file.write(f"---------- Reserve market ----------\n\n")
+            
+            file.write(f"*Up reserve price : {round(up_prices[t],2)}*\n")
+            for g in range(len(Generators_reserve)) :
+                if optimal_up[t][g] != 0 :
+                    file.write(f"{Generators_reserve['Name'][g]} : {optimal_up[t][g]} MW -> {Generators_reserve['Up reserve price'][g]} €/MW\n")
+            
+            file.write(f"\n*Down reserve price : {round(down_prices[t],2)}*\n")
+            for g in range(len(Generators_reserve)) :
+                if optimal_down[t][g] != 0 :
+                    file.write(f"{Generators_reserve['Name'][g]} : {optimal_down[t][g]} MW -> {Generators_reserve['Down reserve price'][g]} €/MW\n")
+                    
+            file.write('\n')
+            file.write(f"---------- Day-ahead market ----------\n\n")
+
+            file.write(f"*Equilibrium price : {round(equilibrium_prices[t],2)}*\n")
+            for g in range(len(Generators_reserve)) :
+                file.write(f"{Generators_reserve['Name'][g]} : {optimal_conv_gen[t][g]}/{Generators_reserve['Capacity'][g]} MW -> {Generators_reserve['Bid price'][g]} €/MW\n")
+            for w in range(len(Wind_Farms)) :
+                file.write(f"{Wind_Farms['Name'][w]} : {optimal_wf_gen[t][w]}/{Wind_Farms['Capacity'][w][t]} MW\n")
+            file.write('\n')
+            for d in range(len(Demands)) :
+                file.write(f"{Demands['Name'][d]} : {optimal_dem[t][d]}/{Demands['Load'][d][t]} MW\n")
+            
+            file.write('\n')
+            
+            
+# Function to plot the prices of the reserve market and the prices of the day-ahead market
+def Plot_prices(up_prices, down_prices, equilibrium_prices) :
+    t = list(range(1,25))
+    plt.figure(figsize = (15, 10))
+    plt.rcParams["font.size"] = 16
+    plt.plot(t, up_prices, 'k-', label='Up reserve prices')
+    plt.plot(t, down_prices, 'b-', label='Down reserve prices')
+    plt.plot(t, equilibrium_prices, 'r+-', label='Day-ahead prices')
+    plt.xlabel('Time [h]')
+    plt.ylabel(' Market clearing price [$/MWh]')
+    plt.legend()
+    plt.show()
+    
+optimal_conv_gen_2, optimal_wf_gen_2, optimal_dem_2, optimal_elec_2, equilibrium_prices_2 = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
+            
+            
+# Function to plot the social welfare, with and without reserve market
+def Plot_SW(Generators_reserve, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_up, optimal_down, equilibrium_prices, up_prices, down_prices, optimal_conv_gen_2, optimal_wf_gen_2, optimal_dem_2, optimal_elec_2, equilibrium_prices_2) :
+    
+    list_hour = list(range(1,25))
+    
+    # Computing the social welfare hour by hour with the reserve market 
+    SW_DA_res = [0]*24
+    for t in range(24) :
+        for w in range(len(Wind_Farms)) :
+            SW_DA_res[t] += equilibrium_prices[t] * optimal_wf_gen[t][w]
+        for g in range(len(Generators_reserve)) :
+            SW_DA_res[t] += (equilibrium_prices[t] - Generators_reserve['Bid price'][g]) * optimal_conv_gen[t][g]
+        for d in range(len(Demands)) :
+            SW_DA_res[t] += (Demands['Offer price'][d][t] - equilibrium_prices[t]) * optimal_dem[t][d]
+            
+    # Cost of the reserve market
+    Reserve_cost = [0]*24
+    for t in range(24) :
+        Reserve_cost[t] += up_prices[t]*sum(optimal_up[t]) + down_prices[t]*sum(optimal_down[t])
+    
+    # Social welfare with cost of reserve market
+    SW_DA_resp = SW_DA_res.copy()
+    for t in range(24) :
+        SW_DA_resp[t] += -Reserve_cost[t]          
+            
+    # Social welfare without taking into account the reserve market
+    SW_DA = [0]*24
+    for t in range(24) :
+        for w in range(len(Wind_Farms)) :
+            SW_DA[t] += equilibrium_prices_2[t] * optimal_wf_gen_2[t][w]
+        for g in range(len(Generators_reserve)) :
+            SW_DA[t] += (equilibrium_prices_2[t] - Generators_reserve['Bid price'][g]) * optimal_conv_gen_2[t][g]
+        for d in range(len(Demands)) :
+            SW_DA[t] += (Demands['Offer price'][d][t] - equilibrium_prices_2[t]) * optimal_dem_2[t][d]
+    
+    plt.figure(figsize = (15, 10))
+    plt.rcParams["font.size"] = 16
+    plt.plot(list_hour, SW_DA, 'r-', label='Social welfare without reserve market')
+    # plt.plot(list_hour, SW_DA_res, 'k--', label='Social welfare without cost of reserve market')
+    plt.plot(list_hour, SW_DA_resp, 'k-', label='Social welfare with reserve market')
+    plt.plot(list_hour, Reserve_cost, 'b-', label='Cost of the reserve market')
+    plt.xlabel('Time [h]')
+    plt.ylabel('Social welfare [$]')
+    plt.ylim(0, 85000)
+    plt.legend(loc=2)
+    plt.show()
+    
+    plt.figure(figsize = (15, 10))
+    plt.rcParams["font.size"] = 16
+    plt.plot(list_hour, equilibrium_prices_2, 'r-', label='Equilibrium prices without reserve market')
+            
+    plt.plot(list_hour, equilibrium_prices, 'k-', label='Equilibrium prices with reserve market')
+    plt.xlabel('Time [h]')
+    plt.ylabel('Equilibrium prices [$/MWh]')
+    plt.ylim(4, 12)
+    plt.legend(loc=3)
+    plt.show()
+
+# Function to compute the benefit of every generators
+def Benefits(Generators_reserve, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices) :
+    #Write output in a text file
+    # Define the folder path and the file name
+    folder_path = "results/reserve"
+    file_name = "Benefits with reserve market.txt"
+    
+    # Create the folder if it doesn't exist
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    # Combine the folder path and file name
+    file_path = os.path.join(folder_path, file_name)
+    
+    # Compute the benefits of generators on the day
+    Gen_ben = [0]*len(Generators_reserve)
+    Wf_ben = [0]*len(Wind_Farms)
+    for t in range(24) :
+        for g in range(len(Generators_reserve)) :    
+            Gen_ben[g] += (equilibrium_prices[t] - Generators_reserve['Bid price'][g]) * optimal_conv_gen[t][g]
+        for w in range(len(Wind_Farms)) :
+            Wf_ben[w] += equilibrium_prices[t] * optimal_wf_gen[t][w]
+    
+    
+    # Open the file in write mode
+    with open(file_path, 'w') as file:
+        file.write("Benefit of every generators")
+        file.write("\n\n")
+        
+        for w in range(len(Wind_Farms)) :
+            file.write(f"{Wind_Farms['Name'][w]} : {round(Wf_ben[w],2)} $\n")
+        file.write("\n\n")
+        for g in range(len(Generators_reserve)) :
+            file.write(f"{Generators_reserve['Name'][g]} : {round(Gen_ben[g],2)} $\n")
+            
+        
+Results_reserve(Generators_reserve, Wind_Farms, Demands, optimal_up, optimal_down, up_prices, down_prices, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices)
+Benefits(Generators_reserve, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices)
+# Benefits(Generators_reserve, Wind_Farms, Demands, optimal_conv_gen_2, optimal_wf_gen_2, optimal_dem_2, optimal_elec_2, equilibrium_prices_2)
+Plot_prices(up_prices, down_prices, equilibrium_prices)
+Plot_SW(Generators_reserve, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_up, optimal_down, equilibrium_prices, up_prices, down_prices, optimal_conv_gen_2, optimal_wf_gen_2, optimal_dem_2, optimal_elec_2, equilibrium_prices_2)
+# Plotting the market equilibrium with the reserve market
+for t in range(1,25) :
+    Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, t)
+    Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
+    Single_hour_plot(Supply_hour, Demands_hour, equilibrium_price, optimal_sup_hour, optimal_dem_hour, f"Day-ahead market hour with reserve market {t}")
+
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
 

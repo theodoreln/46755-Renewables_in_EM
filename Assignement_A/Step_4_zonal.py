@@ -262,7 +262,8 @@ def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
         Zones_case = 0
         Zones_case = Transmission_input(Zones, Case[i])
         optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones_case)
-        Zonal_transmission_prices(Zones_case, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
+        if i == 1 :
+            Zonal_transmission_prices(Zones_case, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
         Prices.append(equilibrium_prices)
     # Plot everything
     Case_1 = Prices[0][0].tolist()
@@ -271,22 +272,28 @@ def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
     Zone_3 = Prices[1][2].tolist()
     t = list(range(1,25))
     plt.figure(figsize = (10, 6))
-    plt.rcParams["font.size"] = 16
-    plt.plot(t, Case_1, 'k+-', label='Case 1')
-    plt.plot(t, Zone_1, 'b-', label='Zone 1')
-    plt.plot(t, Zone_2, 'r-', label='Zone 2')
-    plt.plot(t, Zone_3, 'y-', label='Zone 3')
-    plt.xlabel('Time [h]')
-    plt.ylabel(' Market clearing price [$/MWh]')
+    plt.rcParams["font.size"] = 20
+    plt.step(t, Case_1, 'k+-', label='Case 1')
+    plt.step(t, Zone_1, 'b-', label='Zone 1')
+    plt.step(t, Zone_2, 'r-', label='Zone 2')
+    plt.step(t, Zone_3, 'y-', label='Zone 3')
+    plt.xlabel('Hours')
+    plt.ylabel('Market price [$/MWh]')
     plt.legend()
+    output_folder = os.path.join(os.getcwd(), 'plots\\zonal')
+    pdf_name = 'Social welfare comparison.pdf'
+    pdf_filename = os.path.join(output_folder, pdf_name)
+    plt.savefig(pdf_filename,  bbox_inches='tight')
     plt.show()
+    
+# Compute the SW 
     
 ################################################
 """ Launching the functions for the analysis """
 ################################################
 
 # Launching when we want to plot and to compare two case (keep the first case as the maximum case I think !!)
-Case = [[[1,2,1000,1000],[2,3,1000,1000]], [[1,2,500,500],[2,3,500,500]]]
+Case = [[[1,2,1000,1000],[2,3,1000,1000]], [[1,2,100,100],[2,3,100,100], [1,3,500,500]]]
 Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones_3, Case)
 
 # When you want only one case, and to have the output text file

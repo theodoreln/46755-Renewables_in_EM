@@ -216,7 +216,16 @@ for j in range(len(Transmission)) :
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     
 
+# Function to input easily the transmission capacity in the Zones dict
+def Transmission_input(Zones, T) :
+    Zones_new = copy.deepcopy(Zones)
+    for t in T :
+        node, nodep, back, forth = t
+        Zones_new[node]["L"].append([nodep,back,forth])
+        Zones_new[nodep]["L"].append([node,forth,back])
+    return(Zones_new)
 
+# WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
 
 
 

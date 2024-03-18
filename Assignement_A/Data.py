@@ -133,7 +133,6 @@ Line_capacity = np.zeros((24,24))
 for i in range(len(Transmission)) :
     Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
     Transmission.loc[i, 'Reactance'] = 500
-    Transmission.loc[i, 'Capacity'] = 400
     t = Transmission.iloc[i].tolist()
     name, idf, idt, sus, cap = t
     Line_susceptance[idf-1,idt-1] = sus
@@ -141,7 +140,7 @@ for i in range(len(Transmission)) :
     Line_capacity[idf-1,idt-1] = cap
     Line_capacity[idt-1,idf-1] = cap
     
-    
+   
 Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
 
 Nodes = {}
@@ -216,18 +215,6 @@ for j in range(len(Transmission)) :
     Nodes[node_from]["L"].append([node_to, susceptance, capacity])
     Nodes[node_to]["L"].append([node_from, susceptance, capacity])
     
-    
-# Function to input easily the transmission capacity in the Zones dict
-def Transmission_input(Zones, T) :
-    Zones_new = copy.deepcopy(Zones)
-    for t in T :
-        node, nodep, back, forth = t
-        Zones_new[node]["L"].append([nodep,back,forth])
-        Zones_new[nodep]["L"].append([node,forth,back])
-    return(Zones_new)
-
-# WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
-
 
 
 

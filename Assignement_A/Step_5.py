@@ -1,4 +1,3 @@
-
 from Data import Generators, Demands, Wind_Farms
 from Step_1 import Single_hour_plot, Commodities, Single_hour_optimization
 import numpy as np
@@ -215,12 +214,13 @@ for name in BM_clearing['Name'].values:
 #single and dual pricing
 for index, row in BM_clearing.iterrows():
     BM_clearing.loc[index, 'DA_wo_BM'] =  row['DA_production']*(DA_price - row['DA_bid_price'])
-    BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['BM_bid_price_up']) 
+    #we are subtracting DA_bid_price from BM clearing price because DA_bid_price is the marginal cost of the generators
+    BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['DA_bid_price']) 
     #for dual price we need to distinquish between positive and negative imbalances
     if row['Imbalance'] > 0:
-        BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*DA_price + row['BM_up']*(BM_price - row['BM_bid_price_up'])
+        BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*DA_price + row['BM_up']*(BM_price - row['DA_bid_price'])
     else:
-        BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['BM_bid_price_up'])
+        BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['DA_bid_price'])
 
 print(BM_clearing)
 

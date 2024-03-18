@@ -96,20 +96,6 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
         
     #Constraint on line capacity. Must be fulfilled for each time and for each line
     for t in range(n_hour):
-        # for n in range(1,25):
-        #     L = Nodes[n]["L"] #take the line of information corresponding to each node
-        #     for l in L:
-        #         node_to, susceptance,capacity=l
-        #         name = f'dual {t+1}, {n}, {node_to} '
-        #         model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) <= capacity, name=name+'up') #not sure abt the syntax in this one. upper limit on capacity
-        #         model.addConstr(susceptance*(var_theta[n-1,t]-var_theta[node_to-1,t]) >= -capacity, name=name+'down') #lower limit on capacity
-        # Another version of the code above for the transmission constraints
-        # for tr in range(len(Transmission)) :
-        #     nf, nt, sus, cap = Transmission['From'][tr], Transmission['To'][tr], Transmission['Susceptance'][tr], Transmission['Capacity'][tr]
-        #     print(nf,nt,sus,cap)
-        #     name = f'dual {t+1}, {nf}, {nt} '
-        #     model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) <= cap, name=name+'up')
-        #     model.addConstr(sus*(var_theta[nf-1,t]-var_theta[nt-1,t]) >= -cap, name=name+'down')
         # Version with dataframe
         for n in range(24) :
             for m in range(24) :
@@ -125,12 +111,9 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
     for t in range(n_hour):
         for n in range(1,25):
             constr_name = f"Power balance hour {t+1} in node {n}"
-            L = Nodes[n]["L"] #take the line of information corresponding to each node
             D = Nodes[n]["D"] #take the line of information corresponding to each node
             G = Nodes[n]["G"] #take the line of information corresponding to each node
             W = Nodes[n]["W"] #take the line of information corresponding to each node
-            # for j in range(len(L)) :
-            #     print(n, L[j][0], L[j][1], L[j][2])
                 
             model.addConstr(gp.quicksum(var_dem[d-1,t] for d in D) 
                 - gp.quicksum(var_conv_gen[g-1,t] for g in G) 
@@ -258,26 +241,25 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
                         quantity = quantity_trade[n,m,t]
                         if quantity > 0 :
                             index_lim = next((index for index, sublist in enumerate(Nodes[n+1]["L"]) if sublist[0]==m+1), None)
-                            if quantity == Nodes[n+1]['L'][index_lim][2] :
-                                file.write(f"Transmission with node {m+1} : {quantity}/{Nodes[n+1]['L'][index_lim][2]} MW ----> Line saturated !!!\n")
+                            if quantity == Line_capacity[n,m] :
+                                file.write(f"Transmission with node {m+1} : {quantity}/{Line_capacity[n,m]} MW ----> Line saturated !!!\n")
                             else :
-                                file.write(f"Transmission with node {m+1} : {quantity}/{Nodes[n+1]['L'][index_lim][2]} MW\n")
+                                file.write(f"Transmission with node {m+1} : {quantity}/{Line_capacity[n,m]} MW\n")
                         else :
                             index_lim = next((index for index, sublist in enumerate(Nodes[n+1]["L"]) if sublist[0]==m+1), None)
-                            if quantity == -Nodes[n+1]['L'][index_lim][2] :
-                                file.write(f"Transmission with node {m+1} : {quantity}/{-Nodes[n+1]['L'][index_lim][2]} MW ----> Line saturated !!!\n")
+                            if quantity == -Line_capacity[n,m]:
+                                file.write(f"Transmission with node {m+1} : {quantity}/{-Line_capacity[n,m]} MW ----> Line saturated !!!\n")
                             else :
-                                file.write(f"Transmission with node {m+1} : {quantity}/{-Nodes[n+1]['L'][index_lim][2]} MW\n")
+                                file.write(f"Transmission with node {m+1} : {quantity}/{-Line_capacity[n,m]} MW\n")
                 file.write("\n")
 
 optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission)
 Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
 
 
-
 node_prices = [equilibrium_prices[0,:].tolist()]  # Change the index to match the desired node number
 
-#change the transmission capacity
+# Change the transmission capacity 
 Line_capacity[15-1, 21-1] = 400
 Line_capacity[21-1, 15-1] = 400
 Line_capacity[14-1, 16-1] = 250

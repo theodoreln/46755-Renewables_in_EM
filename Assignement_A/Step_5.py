@@ -180,27 +180,31 @@ Balancing_gen_up['BM production'] = BM_up
 Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Name'] != 'Curtailment']
 Balancing_gen_dw['BM production'] = BM_dw
 
-#print(Balancing_gen)
-#print(Balancing_gen_up)  
-#print(Balancing_gen_dw)
-
 #Formulating the balancing market dataframe
 BM_clearing.rename(columns={'Production': 'DA_production'}, inplace=True)
+BM_clearing['DA_bid_price'] = [0] * len(BM_clearing)
+BM_clearing = BM_clearing.merge(Balancing_gen_up[['Name', 'Bid price']], on='Name', how='left', suffixes=('', ''))
+BM_clearing = BM_clearing.merge(Balancing_gen_dw[['Name', 'Bid price']], on='Name', how='left', suffixes=('', ' dw'))
 BM_clearing['Imbalance'] = [0] * len(BM_clearing)
 BM_clearing['BM_up'] = [0] * len(BM_clearing)
 BM_clearing['BM_dw'] = [0] * len(BM_clearing)
 BM_clearing['DA_wo_BM'] = [0] * len(BM_clearing)
 BM_clearing['single-price'] = [0] * len(BM_clearing)
 BM_clearing['dual-price'] = [0] * len(BM_clearing)
+BM_clearing.rename(columns={'Bid price': 'BM_bid_price_up', 'Bid price dw': 'BM_bid_price_dw'}, inplace=True)
+BM_clearing.fillna(0, inplace=True)
+
+for name in BM_clearing['Name'].values:
+    BM_clearing.loc[BM_clearing['Name'] == name, 'DA_bid_price'] = Generators.loc[Generators['Name'] == name, 'Bid price']
 
 for name in BM_clearing['Name'].values:
     #Imbalances
     if name in CG_outage:
         BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']
     if name in WF_lower:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*0.1
+        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*WF_down_imbalance
     if name in WF_higher:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*0.15
+        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*WF_up_imbalance
 
     #Balancing market up & down productions
     if name in Balancing_gen_up['Name'].values:
@@ -208,31 +212,31 @@ for name in BM_clearing['Name'].values:
     if name in Balancing_gen_dw['Name'].values:
         BM_clearing.loc[BM_clearing['Name'] == name, 'BM_dw'] = Balancing_gen_dw.loc[Balancing_gen_dw['Name'] == name, 'BM production'].values
 
-
-#distinquishing between energy deficit and surplus imbalances
+#distinquishing between energy deficit and excess imbalances
 if Dp > 0:
     for index, row in BM_clearing.iterrows():
-        BM_clearing.loc[index, 'DA_wo_BM'] = row['DA_production']*DA_price
-        BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price 
+        BM_clearing.loc[index, 'DA_wo_BM'] =  row['DA_production']*(DA_price - row['DA_bid_price'])
+        BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['BM_bid_price_up']) 
         #for dual price we need to distinquish whether individual imbalances have a positive or negative impact so to apply either DA or 
         # balancing price, conventional generator outages can be implemented here since always balancing price is applied 
         if row['Imbalance'] > 0:
-            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*DA_price + row['BM_up']*BM_price 
+            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*DA_price + row['BM_up']*(BM_price - row['BM_bid_price_up'])
         else:
-            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price + row['BM_up']*BM_price
+            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['BM_bid_price_up'])
 else:
     for index, row in BM_clearing.iterrows():
-        BM_clearing.loc[index, 'DA_wo_BM'] = row['DA_production']*DA_price
+        BM_clearing.loc[index, 'DA_wo_BM'] =  row['DA_production']*(DA_price - row['DA_bid_price'])
         #we need to distinquish for the  outage of conventional genrators since they always need to pay when they fail to deliver
         if row['Name'] in CG_outage:
-            BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price 
+            BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price 
         else:
-            BM_clearing.loc[index, 'single-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price - row['BM_dw']*BM_price
-            if row['Imbalance'] < 0:
-                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*DA_price - row['BM_dw']*BM_price
+            #the negative sign on the 'imbalance' just reverses the farm imbalances because now the total ibalance is positive,
+            #so positive individual imbalances actually impede the system and the other way around
+            BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) - row['Imbalance']*BM_price + row['BM_dw']*(BM_price - row['BM_bid_price_dw'])
+            if row['Imbalance'] > 0:
+                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) - row['Imbalance']*DA_price + row['BM_dw']*(BM_price - row['BM_bid_price_dw'])
             else:
-                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*DA_price + row['Imbalance']*BM_price - row['BM_dw']*BM_price
-
+                BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) - row['Imbalance']*BM_price + row['BM_dw']*(BM_price - row['BM_bid_price_dw'])
 
 print(BM_clearing)
 

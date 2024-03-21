@@ -1,4 +1,10 @@
-""" Code for importing the relevant data """
+# The goal of this file is to input the main data of the problem
+# Those variables will be imported by the others files 
+# Most of the values are stored in dataframes
+
+########################
+""" Relevant modules """
+########################
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,58 +16,54 @@ import copy
 """ Variables used in this file """
 ###################################
 
-# Informations on generating units are in the dataframe 'Generators' with the columns names :
-    # 'Name' for the name of the generator
-    # 'Node' for the number of the node
-    # 'Capacity' for the maximum capacity of the generator
-    # 'Ramp up' for the ramp up limit of the generator
-    # 'Ramp down' for the ramp down limit of the generator
-    # 'Bid price' for the bid price of the generator
-    
-# Informations on wind farms units are in the dataframe 'Wind_Farms' with the columns names :
-    # 'Name' for the name of the wind farm
-    # 'Node' for the number of the node
-    # 'Capacity' for the maximum capacity of the wind farm
-    # 'Bid price' for the bid price of the wind farm
-    
-# Informations on demanding units are in the dataframe 'Demands' with the columns names :
-    # 'Name' for the name of the demand
-    # 'Node' for the number of the node
-    # 'Load' for the load of the demand
-    # 'Offer price' for the offer price of the demand
+# Informations on generating units are in the dataframe 'Generators'
+# Informations on wind farms units are in the dataframe 'Wind_Farms'
+# Informations on demanding units are in the dataframe 'Demands'
+# Informations on transmission lines are in 
     
   
 #############################################
 """ Import values of the generators units """
 #############################################
 
+# Informations on generating units are in the dataframe 'Generators' with the columns names :
+    # 'Name' for the name of the generator
+    # 'Node' for the node related
+    # 'Capacity' for the maximum capacity of the generator
+    # 'Ramp up' for the ramp up limit of the generator
+    # 'Ramp down' for the ramp down limit of the generator
+    # 'Initial power' for the capacity provided at t=0
+    # 'Bid price' for the bid price of the generator
+    # 'Maximum up reserve' and 'Maximum down reserve' to limit the quantity offer to the reserve market
+    # 'Up reserve price' and 'Down reserve price' correspond to the price at which the reserve is offered
+
 Generators = pd.DataFrame([
-    ['Generator 1', 1, 152, 120, 120, 76, 13.32],
-    ['Generator 2', 2, 152, 120, 120, 76, 13.32],
-    ['Generator 3', 7, 350, 350, 350, 0, 20.7],
-    ['Generator 4', 13, 591, 240, 240, 0, 20.93],
-    ['Generator 5', 15, 60, 60, 60, 0, 26.11],
-    ['Generator 6', 15, 155, 155, 155, 0, 10.52],
-    ['Generator 7', 16, 155, 155, 155, 124, 10.52],
-    ['Generator 8', 18, 400, 280, 280, 240, 6.02],
-    ['Generator 9', 21, 400, 280, 280, 240, 5.47],
-    ['Generator 10', 22, 300, 300, 300, 240, 0],
-    ['Generator 11', 23, 310, 180, 180, 248, 10.52],
-    ['Generator 12', 23, 350, 240, 240, 280, 10.89]],
-    columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Initial power', 'Bid price'])
-
-Generators_reserve = Generators.copy()
-
-Generators_reserve['Maximum up reserve'] = [40, 40, 70, 180, 60, 30, 30, 0, 0, 0, 60, 40]
-Generators_reserve['Maximum down reserve'] = [40, 40, 70, 180, 60, 30, 30, 0, 0, 0, 60, 40]
-Generators_reserve['Up reserve price'] = [15, 15, 10, 8, 7, 16, 16, 0, 0, 0, 17, 16]
-Generators_reserve['Down reserve price'] = [14, 14, 9, 7, 5, 14, 14, 0, 0, 0, 16, 14]
+    ['Generator 1', 1, 152, 120, 120, 76, 13.32, 40, 40, 15, 14],
+    ['Generator 2', 2, 152, 120, 120, 76, 13.32, 40, 40, 15, 14],
+    ['Generator 3', 7, 350, 350, 350, 0, 20.7, 70, 70, 10, 9],
+    ['Generator 4', 13, 591, 240, 240, 0, 20.93, 180, 180, 8, 7],
+    ['Generator 5', 15, 60, 60, 60, 0, 26.11, 60, 60, 7, 5],
+    ['Generator 6', 15, 155, 155, 155, 0, 10.52, 30, 30, 16, 14],
+    ['Generator 7', 16, 155, 155, 155, 124, 10.52, 30, 30, 16, 14],
+    ['Generator 8', 18, 400, 280, 280, 240, 6.02, 0, 0, 0, 0],
+    ['Generator 9', 21, 400, 280, 280, 240, 5.47, 0, 0, 0, 0],
+    ['Generator 10', 22, 300, 300, 300, 240, 0, 0, 0, 0, 0],
+    ['Generator 11', 23, 310, 180, 180, 248, 10.52, 60, 60, 17, 16],
+    ['Generator 12', 23, 350, 240, 240, 280, 10.89, 40, 40, 16, 14]],
+    columns=['Name', 'Node', 'Capacity', 'Ramp up', 'Ramp down', 'Initial power', 'Bid price', 'Maximum up reserve', 'Maximum down reserve', 'Up reserve price', 'Down reserve price'])
 
 
 #########################################
 """ Import values of the demand units """
 #########################################
 
+# Informations on demanding units are in the dataframe 'Demands' with the columns names :
+    # 'Name' for the name of the demand
+    # 'Node' for the number of the node
+    # 'Load' for the load of the demand
+    # 'Offer price' for the offer price of the demand
+
+# This dataframe represents the total demand load at each time step
 Load_profile = pd.DataFrame([
     [1, 1775.835], [2, 1669.815], [3, 1590.3],
     [4, 1563.795], [5, 1563.795], [6, 1590.3],
@@ -73,6 +75,7 @@ Load_profile = pd.DataFrame([
     [22, 2199.915], [23, 1934.865], [24, 1669.815]],
     columns=['Hour', 'Load'])
 
+# This dataframe represents the load distribution over the nodes
 Load_distribution = pd.DataFrame([
     ['Demand 1', 1, 0.038], ['Demand 2', 2, 0.034],
     ['Demand 3', 3, 0.063], ['Demand 4', 4, 0.026],
@@ -85,17 +88,17 @@ Load_distribution = pd.DataFrame([
     ['Demand 17', 20, 0.045]],
     columns=['Name', 'Node', 'Percentage'])
 
+# Creating the 'Demands' dataframe from the two others dataframe
+# The max offer price should be higher than the last generator bid price, to be sure all demand is meet
 max_bid_price = Generators['Bid price'].max()
 nb_demand = len(Load_distribution)
 nb_hour = len(Load_profile)
 offer_price_step = round(max_bid_price*0.5/nb_demand,2)
-
 demands = []
 for i in range(nb_demand):
     demands.append([Load_distribution['Name'][i], Load_distribution['Node'][i],
                     [round(Load_distribution['Percentage'][i]*Load_profile['Load'][j],2) for j in range(nb_hour)],
                     [round(max_bid_price*1.5-offer_price_step*i,2) for j in range(nb_hour)]])
-
 Demands = pd.DataFrame(demands,
                        columns=['Name', 'Node', 'Load', 'Offer price'])
 
@@ -104,7 +107,14 @@ Demands = pd.DataFrame(demands,
 """ Import values of the wind farms units """
 #############################################
 
-# I took zone 1,2,3,7,8,9
+# Informations on wind farms units are in the dataframe 'Wind_Farms' with the columns names :
+    # 'Name' for the name of the wind farm
+    # 'Node' for the number of the node
+    # 'Capacity' for the maximum capacity of the wind farm
+    # 'Bid price' for the bid price of the wind farm
+
+# Zones 1,2,3,7,8,9 with wind profils from the 24-bus paper
+# The maximum capacity depends of the time step, wind profils are list of 24 numbers
 Wind_Farms = pd.DataFrame([
     ['Wind farm 1', 3, [105.85, 118.54, 136.00, 147.67, 153.35, 154.79, 155.74, 157.22, 155.57, 154.26, 149.86, 140.65, 134.44, 130.41, 127.36, 129.23, 127.01, 127.16, 131.63, 134.49, 136.04, 140.69, 136.66, 137.92], [0]*nb_hour],
     ['Wind farm 2', 5, [132.04, 139.63, 142.69, 145.88, 145.68, 146.06, 146.08, 145.28, 143.46, 144.04, 145.52, 144.69, 141.30, 140.87, 143.54, 142.99, 143.36, 141.71, 143.28, 144.06, 145.94, 147.88, 141.53, 136.34], [0]*nb_hour],
@@ -119,6 +129,8 @@ Wind_Farms = pd.DataFrame([
 """ Transmission lines """
 ##########################
 
+# The data frame 'Transmission' store the informations about all lines as we get them from the article
+# It is used to create other variables that are more easy to use for our problems
 Transmission = pd.DataFrame([
     ['Line 1', 1, 2, 0.0146, 175], ['Line 2',1, 3, 0.2253, 175], ['Line 3',1, 5, 0.0907, 350], ['Line 4',2, 4, 0.1356, 175], ['Line 5',2, 6, 0.205, 175], ['Line 6',3, 9, 0.1271, 175],
     ['Line 7',3, 24, 0.084, 400], ['Line 8',4, 9, 0.111, 175], ['Line 9',5, 10, 0.094, 350], ['Line 10',6, 10, 0.0642, 175], ['Line 11',7, 8, 0.0652, 350], ['Line 12',8, 9, 0.1762, 175],
@@ -127,37 +139,59 @@ Transmission = pd.DataFrame([
     ['Line 25',15, 21, 0.0249, 1000], ['Line 26',15, 24, 0.0529, 500], ['Line 27',16, 17, 0.0263, 500], ['Line 28',16, 19, 0.0234, 500], ['Line 29',17, 18, 0.0143, 500], ['Line 30',17, 22, 0.1069, 500],
     ['Line 31',18, 21, 0.0132, 1000], ['Line 32',19, 20, 0.0203, 1000], ['Line 33',20, 23, 0.0112, 1000], ['Line 34',21, 22, 0.0692, 500]],
     columns=['Name', 'From', 'To', 'Reactance', 'Capacity'])
+Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
 
+# The array 'Line_susceptance' represent the susceptance of the line between two nodes (24x24), 0 if not line
+# The array 'Line_capacity' represent the capacity of the line between two nodes (24x24), 0 if not line
 Line_susceptance = np.zeros((24,24))
 Line_capacity = np.zeros((24,24))
 for i in range(len(Transmission)) :
-    Transmission.loc[i, 'Reactance'] = 1/Transmission['Reactance'][i]
-    Transmission.loc[i, 'Reactance'] = 500
+    Transmission.loc[i, 'Susceptance'] = 1/Transmission['Susceptance'][i]
+    # It has been decided to put all susceptance to 500 for the purpose of the assignement
+    Transmission.loc[i, 'Susceptance'] = 500
+    # Extract one by one each element of the 'Transmission' dataframe and put it in the right table
     t = Transmission.iloc[i].tolist()
     name, idf, idt, sus, cap = t
     Line_susceptance[idf-1,idt-1] = sus
     Line_susceptance[idt-1,idf-1] = sus
     Line_capacity[idf-1,idt-1] = cap
     Line_capacity[idt-1,idf-1] = cap
-    
-   
-Transmission = Transmission.rename(columns={'Reactance': 'Susceptance'})
+
+
+#############################
+""" Nodal and zonal study """
+#############################
+
+# The dictionnay 'Nodes', 'Zones_2', and 'Zones_3' helps representing the spatial distribution of the network
+# Each element of the spatial distribution (one node, one zone) is represented by a key (nb of the node or nb of the zone) and associated with a dictionnary containing :
+    # At the key 'D' the id(s) of the demand related in a list
+    # At the key 'G' the id(s) of the conventional generators related in a list
+    # At the key 'W' the id(s) of the wind-farms related in a list
+    # At the key 'L' the informations about the transmission line in a list of lists on the format :
+        # First element, the id of the node/zone the line is going to
+        # Second element, the susceptance of the line
+        # Third element, the capacity of the line
+# The difference of Zones_2 and Zones_3 is the number of zone. For this study, it has been considered 3 zones.
+# WARNING : The index in the Nodes/Zones dictionnary need to be reduced by one when we search in the index of the optimization variables
+        
 
 Nodes = {}
+
 Zones_2 = {}
 Zones_2_1 = [1,2,3,4,5,6,7,8,9,10,11,12,13]
 Zones_2_2 = [14,15,16,17,18,19,20,21,22,23,24]
+
 Zones_3 = {}
 Zones_3_1 = [1,2,3,4,5,6,7,8,9,10]
 Zones_3_2 = [11,12,13,14,19,20,22,23,24]
 Zones_3_3 = [15,16,17,18,21]
 
+
+# Initialization of the dictionnaries
 for i in range(1,25) :
     Nodes[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
-    
 for i in range(1,3) :
     Zones_2[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
-
 for i in range(1,4) :
     Zones_3[i] = {"D" : [], "G" : [], "W" : [], "L" : []}
     
@@ -224,15 +258,6 @@ def Transmission_input(Zones, T) :
         Zones_new[node]["L"].append([nodep,back,forth])
         Zones_new[nodep]["L"].append([node,forth,back])
     return(Zones_new)
-
-# WARNING : The index in the Nodes dictionnary need to be reduced by one when we search in the index of the optimization variables
-
-
-
-
-
-
-
 
 
 

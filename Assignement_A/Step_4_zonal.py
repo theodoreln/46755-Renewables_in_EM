@@ -1,5 +1,11 @@
+# The goal of this file is to do the 4 step with nodal network of the assignment
+# Example of function call are put at the end 
 
-from Data import Generators, Demands, Wind_Farms, Transmission, Zones_2, Zones_3, Transmission_input
+########################
+""" Relevant modules """
+########################
+
+from Data import Generators, Demands, Wind_Farms, Zones_2, Zones_3, Transmission_input
 from Step_1 import Single_hour_plot, Commodities
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,19 +16,25 @@ import copy
 import os
 GRB = gp.GRB
 
+
 ############################
 """ Optimization problem """
 ############################
 
-#Parameters of our problem
-# Number of hours (but the data are already considered with 24 hours)
-n_hour = 24
-# Index of the electrolyzer, change first numbers to change the place
-index_elec = {0:0, 1:1}
-# Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 20
+# This function is the main optimization function for the nodal problem for multiple hours with inter-temporal constraints
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The dictionnary 'Zones' with information about the zones
+# And gives as an output :
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The decision for the transmission of electricity in an array of three dimension : 'optimal_trans'
+    # The equilibrium prices for every hour and each node in an array : 'equilibrium_prices'
 
-# Taking the hour supply and load information and optimizing on 24 hours in zonal mode
 def Zonal_optimization(Generators, Wind_Farms, Demands, Zones) :
     #Number of units to take into account (based on data)
     # Number of conventional generation units
@@ -161,6 +173,7 @@ def Zonal_optimization(Generators, Wind_Farms, Demands, Zones) :
             temps = -1
             for c in model.getConstrs():
                 file.write(f"{c.ConstrName}: {c.Pi} : {c.Sense} \n")
+                # Get the equilibrium prics in each zone
                 if 'Power balance hour' in c.constrName :
                     remind = ind % n_zones
                     if remind == 0:
@@ -177,6 +190,20 @@ def Zonal_optimization(Generators, Wind_Farms, Demands, Zones) :
 ##########################################################
 """ Written output of transmission decision and prices """
 ##########################################################
+
+# This function is writting in a text file, for every hour and every nodes the result of the optimization
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dictionnary 'Zones' with information about the zones
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The decision for the transmission of electricity in an array of three dimension : 'optimal_trans'
+    # The equilibrium prices for every hour and each node in an array : 'equilibrium_prices'
+# It outputs a text file with all the information
 
 def Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices) :
     # Number of zones
@@ -249,11 +276,20 @@ def Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_co
                                 file.write(f"Transmission with zone {m+1} : {optimal_trans[n,m,t]}/{-Zones[n+1]['L'][index_lim][2]} MW\n")
                 file.write("\n")
                         
+                
 #########################################
 """ Sensitivity analysis and plotting """
 #########################################
 
-# Function for the sensitivity analysis 
+# This function is doing a sensitivity analysis of the zonal network with different lines configuration, one base and the other one
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The dictionnary 'Zones' with information about the zones
+    # The list of list of list 'Case' with different configuration
+# It outputs a plot with a sensitivity analysis on the zonal prices
+
 def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
     # Step to repeat for every case 
     nb_case = len(Case)
@@ -265,11 +301,13 @@ def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
         if i == 1 :
             Zonal_transmission_prices(Zones_case, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
         Prices.append(equilibrium_prices)
-    # Plot everything
+        
+    # Plot the sensitivity analysis of the zonal prices
     Case_1 = Prices[0][0].tolist()
     Zone_1 = Prices[1][0].tolist()
     Zone_2 = Prices[1][1].tolist()
     Zone_3 = Prices[1][2].tolist()
+    
     t = list(range(1,25))
     plt.figure(figsize = (10, 6))
     plt.rcParams["font.size"] = 20
@@ -280,36 +318,46 @@ def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
     plt.xlabel('Hours')
     plt.ylabel('Market price [$/MWh]')
     plt.legend()
+    
     output_folder = os.path.join(os.getcwd(), 'plots\\zonal')
-    pdf_name = 'Social welfare comparison.pdf'
+    pdf_name = 'Zonal prices comparison.pdf'
     pdf_filename = os.path.join(output_folder, pdf_name)
     plt.savefig(pdf_filename,  bbox_inches='tight')
     plt.show()
+
+
+################################
+""" How to use the functions """
+################################
+
+if __name__ == "__main__":     
+    #Parameters of our problem
+    # Number of hours (but the data are already considered with 24 hours)
+    n_hour = 24
+    # Index of the electrolyzer, change first numbers to change the place
+    index_elec = {0:0, 1:1}
+    # Hydrogen demand per electrolyser (in tons)
+    Hydro_demand = 20
     
-# Compute the SW 
     
-################################################
-""" Launching the functions for the analysis """
-################################################
-
-# Launching when we want to plot and to compare two case (keep the first case as the maximum case I think !!)
-Case = [[[1,2,1000,1000],[2,3,1000,1000]], [[1,2,100,100],[2,3,100,100], [1,3,500,500]]]
-Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones_3, Case)
-
-# When you want only one case, and to have the output text file
-# T_2 = [[1,2,1000,1000]]
-# T_3 = [[1,2,500,1000],[2,3,500,1000]]  
-# Zones_2 = Transmission_input(Zones_2, T_2)  
-# Zones_3 = Transmission_input(Zones_3, T_3)                    
-# Zones = Zones_3
-# optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones)
-# Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
-
-
-
-
-
-
+    # When you want only one case, and to have the output text file
+    T_2 = [[1,2,1000,1000]]
+    T_3 = [[1,2,500,1000],[2,3,500,1000]] 
+    
+    # Put inside of the dictionnary, the right lines configuration
+    Zones_2 = Transmission_input(Zones_2, T_2)  
+    Zones_3 = Transmission_input(Zones_3, T_3)   
+    
+    # Launching only 3 zones for example            
+    Zones = Zones_3
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones)
+    Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
+    
+    # For the sensitivity analysis, you put two different configuraration, the first one is the base case
+    Case = [[[1,2,1000,1000],[2,3,1000,1000]], [[1,2,100,100],[2,3,100,100], [1,3,500,500]]]
+    Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones_3, Case)
+    
+    
 
 
 

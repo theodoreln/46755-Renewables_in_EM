@@ -1,5 +1,11 @@
+# The goal of this file is to do the 4 step with nodal network of the assignment
+# Example of function call are put at the end 
 
-from Data import Generators, Demands, Wind_Farms, Transmission, Nodes, Line_susceptance, Line_capacity
+########################
+""" Relevant modules """
+########################
+
+from Data import Generators, Demands, Wind_Farms, Nodes, Line_susceptance, Line_capacity
 from Step_1 import Single_hour_plot, Commodities
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,25 +18,26 @@ from math import pi
 GRB = gp.GRB
 
 
-############################
-""" Optimization problem """
-############################
+######################################
+""" Optimization clearing function """
+######################################
 
-#Parameters of our problem
-# Number of hours (but the data are already considered with 24 hours)
-n_hour = 24
-# Index of the electrolyzer, change first numbers to change the place
-index_elec = {0:0, 1:1}
-# Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 0
-#Number of nodes in network
-n_nodes=24
+# This function is the main optimization function for the nodal problem for multiple hours with inter-temporal constraints
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The dictionnary 'Nodes' with information about the nodes
+# And gives as an output :
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The decision for the angle theta of each node in a list of list (nb_hour x nb_bus) : 'optimal_theta'
+    # The quantity trade (MW) for every hour between every node in an array : 'quantity_trade'
+    # The equilibrium prices for every hour and each node in an array : 'equilibrium_prices'
 
-
-# Taking the hour supply and load information and optimizing on 24 hours
-def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
-    # Global variables
-    # global optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec
+def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity) :
     #Number of units to take into account (based on data)
     # Number of conventional generation units
     n_gen = len(Generators)
@@ -164,6 +171,7 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
             temps = -1
             for c in model.getConstrs():
                 file.write(f"{c.ConstrName}: {c.Pi} : {c.Sense} \n")
+                # Get the equilibrium prices for every nodes
                 if 'Power balance hour' in c.constrName :
                     remind = ind % n_nodes
                     if remind == 0:
@@ -180,9 +188,23 @@ def Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission) :
 ##########################################################
 """ Written output of transmission decision and prices """
 ##########################################################
+
+# This function is writting in a text file, for every hour and every nodes the result of the optimization
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dictionnary 'Nodes' with information about the nodes
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The quantity trade (MW) for every hour between every node in an array : 'quantity_trade'
+    # The equilibrium prices for every hour and each node in an array : 'equilibrium_prices'
+# It outputs a text file with all the information
                 
 def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices) :
-    # Number of zones
+    # Number of nodes
     n_nodes = len(Nodes)
     
     #Write output in a text file
@@ -202,11 +224,13 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
         file.write("Transmission and equilibrium prices for the nodal optimization :")
         file.write("\n\n")
         
+        # For every time step
         for t in range(n_hour) :
             file.write(f"\n------------------------------------------------")
             file.write(f"\n-------------------- Hour {t+1} --------------------")
             file.write("\n\n")
             
+            # For every nodes
             for n in range(n_nodes) :
                 file.write(f"---------- Node {n+1} ----------\n")
                 file.write(f"*Equilibrium price : {round(equilibrium_prices[n,t],2)}*\n")
@@ -219,6 +243,7 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
                 Dem = round(sum([optimal_dem[t][d-1] for d in D]),2)
                 Dem_tot = round(sum([Demands["Load"][d-1][t] for d in D]),2)
                 
+                # The power generated by each generator
                 file.write(f"\nPower generation : {Gen}/{Gen_tot} MW\n")
                 for g in G :
                     file.write(f"      {Generators['Name'][g-1]} : {optimal_conv_gen[t][g-1]}/{Generators['Capacity'][g-1]} MW\n")
@@ -228,14 +253,16 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
                         file.write(f"          Electrolyzer : {optimal_elec[t][index_elec[w-1]]} MW\n")
                     else :
                         file.write(f"      {Wind_Farms['Name'][w-1]} : {optimal_wf_gen[t][w-1]}/{Wind_Farms['Capacity'][w-1][t]} MW\n")
+                # Each demand that is met
                 file.write(f"\nPower demand : {Dem}/{Dem_tot} MW\n")
                 for d in D :
                     if optimal_dem[t][d-1] != Demands['Load'][d-1][t] :
                         file.write(f"      {Demands['Name'][d-1]} : {optimal_dem[t][d-1]}/{Demands['Load'][d-1][t]} MW ----> Demand not fulfilled\n")
                     else :
                         file.write(f"      {Demands['Name'][d-1]} : {optimal_dem[t][d-1]}/{Demands['Load'][d-1][t]} MW\n")
-                
                 file.write("\n")
+                
+                # The transmission between every nodes
                 for m in range(n_nodes) :
                     if m+1 in [Nodes[n+1]["L"][l][0] for l in range(len(Nodes[n+1]["L"]))]:
                         quantity = quantity_trade[n,m,t]
@@ -253,35 +280,41 @@ def Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optim
                                 file.write(f"Transmission with node {m+1} : {quantity}/{-Line_capacity[n,m]} MW\n")
                 file.write("\n")
 
-optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission)
-Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
 
+####################################
+""" For the sensitivity analysis """
+####################################
 
-node_prices = [equilibrium_prices[0,:].tolist()]  # Change the index to match the desired node number
-
-# Change the transmission capacity 
-Line_capacity[15-1, 21-1] = 400
-Line_capacity[21-1, 15-1] = 400
-Line_capacity[14-1, 16-1] = 250
-Line_capacity[16-1, 14-1] = 250
-Line_capacity[13-1, 23-1] = 250
-Line_capacity[23-1, 13-1] = 250
-
-#run again the function to get equilibrium price. Comment next line to obtain Objective value for non-constrained model
-optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Transmission)
-Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
-
-
-#store the prices of the nodes that I want 
-node_prices.append(equilibrium_prices[7,:].tolist())  # Node 21 (adjusted index)
-node_prices.append(equilibrium_prices[14,:].tolist())  # Node 15 (adjusted index)
-node_prices.append(equilibrium_prices[20,:].tolist())  # Node 21 (adjusted index)
-
-node_numbers = [1,8, 15, 21]  # Node numbers corresponding to each sublist
-
-
-
-def plot_congested1_nodal(node_prices, node_numbers, save_path=None):
+# The function is used to do the sensitivity analysis between the base case and another case
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The dictionnary 'Nodes' with information about the nodes
+# It outputs a graphs with the sensitivity analysis of the equilibrium prices in a nodal system
+    
+def Sensitivity_nodal(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity) :
+    # First computation with the base case
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
+    # We keep into memory the nodes equilibrium prices    
+    node_prices = [equilibrium_prices[0,:].tolist()]  # Change the index to match the desired node number
+    # # Change the transmission capacity 
+    Line_capacity[15-1, 21-1] = 400
+    Line_capacity[21-1, 15-1] = 400
+    Line_capacity[14-1, 16-1] = 250
+    Line_capacity[16-1, 14-1] = 250
+    Line_capacity[13-1, 23-1] = 250
+    Line_capacity[23-1, 13-1] = 250
+    # Run again the function to get equilibrium price. Comment next line to obtain Objective value for non-constrained model
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
+    # Store the equilibrium prices of the nodes that we want 
+    node_prices.append(equilibrium_prices[7,:].tolist())  # Node 8 (adjusted index)
+    node_prices.append(equilibrium_prices[14,:].tolist())  # Node 15 (adjusted index)
+    node_prices.append(equilibrium_prices[20,:].tolist())  # Node 21 (adjusted index)
+    node_numbers = [1,8, 15, 21]  # Node numbers corresponding to each sublist
+    
+    # Plotting the sensitivity analysis
+    # Dimension of the plot and font size
     fig, ax1 = plt.subplots(figsize=(20, 12))
     plt.rcParams["font.size"] = 16
     
@@ -299,25 +332,60 @@ def plot_congested1_nodal(node_prices, node_numbers, save_path=None):
     ax1.set_ylabel('Nodal Market Price ($/MWh)')
     ax1.legend(loc='upper left')
     
+    # Define the path where you want to save the plot
+    folder_path = "plots/nodal"
+    file_name = "Congested1_plot.pdf"
+    save_path = os.path.join(folder_path, file_name)
+
+    # Create the folder if it doesn't exist
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
     # Save the plot as an image if save_path is provided
     if save_path:
         plt.savefig(save_path, bbox_inches='tight')
+        plt.show()
         plt.close()
     else:
         plt.show()
 
 
-# Define the path where you want to save the plot
-folder_path = "plots/step4_nodal"
-file_name = "congested1_plot.png"
-save_path = os.path.join(folder_path, file_name)
+################################
+""" How to use the functions """
+################################
 
-# Create the folder if it doesn't exist
-if not os.path.exists(folder_path):
-    os.makedirs(folder_path)
+if __name__ == "__main__":     
+    #Parameters of our problem
+    # Number of hours (but the data are already considered with 24 hours)
+    n_hour = 24
+    # Index of the electrolyzer, change first numbers to change the place
+    index_elec = {0:0, 1:1}
+    # Hydrogen demand per electrolyser (in tons)
+    Hydro_demand = 20
+    #Number of nodes in network
+    n_nodes=24
+    
+    # To launch the optimization function with the input data
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
+    # To output the solution of the optimization problem in every time step and every node
+    Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
+    # To plot the sensitivity analysis of the study for nodal network
+    Sensitivity_nodal(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
 
-# Plot the equilibrium prices for all nodes and save the plot as an image
-plot_congested1_nodal(node_prices, node_numbers, save_path=save_path)
-
-# Call the function to write equilibrium prices to a file
-#Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

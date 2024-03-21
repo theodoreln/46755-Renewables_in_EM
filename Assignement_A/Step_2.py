@@ -1,3 +1,10 @@
+# The goal of this file is to do the second step of the assignment
+# The copper-plate system for multiple hour + inter-temporal constraints
+# Example of function call are put at the end 
+
+########################
+""" Relevant modules """
+########################
 
 from Data import Generators, Demands, Wind_Farms
 from Step_1 import Single_hour_plot, Commodities
@@ -10,24 +17,32 @@ import copy
 import os
 GRB = gp.GRB
 
-
-############################
-""" Optimization problem """
-############################
-
 #Parameters of our problem
 # Number of hours (but the data are already considered with 24 hours)
 n_hour = 24
 # Index of the electrolyzer, change first numbers to change the place
 index_elec = {0:0, 1:1}
 # Hydrogen demand per electrolyser (in tons)
-Hydro_demand = 0
+Hydro_demand = 20
 
 
-# Taking the hour supply and load information and optimizing on 24 hours
+######################################
+""" Optimization clearing function """
+######################################
+
+# This function is the main optimization function of the copper-plate problem for multiple hours with inter-temporal constraints
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+# And gives as an output :
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The equilibrium prices for every hour obtained from the dual variable : 'equilibrium_prices'
+
 def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
-    # Global variables
-    # global optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec
     #Number of units to take into account (based on data)
     # Number of conventional generation units
     n_gen = len(Generators)
@@ -41,13 +56,13 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
     model = gp.Model()
     #Initialize the decision variables, each one of them is now time dependant
     # Capacities provided by conventional generation units
-    var_conv_gen = model.addVars(n_gen, n_hour, vtype=GRB.CONTINUOUS, name='conv_gen')
+    var_conv_gen = model.addVars(n_gen, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='conv_gen')
     # Capacities provided by wind farms
-    var_wf_gen = model.addVars(n_wf, n_hour, vtype=GRB.CONTINUOUS, name='wf_gen')
+    var_wf_gen = model.addVars(n_wf, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='wf_gen')
     # Demand capacities fullfilled
-    var_dem = model.addVars(n_dem, n_hour, vtype=GRB.CONTINUOUS, name='dem')
+    var_dem = model.addVars(n_dem, n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='dem')
     # Capacities provided to the electrolyzer
-    var_elec = model.addVars(len(index_elec), n_hour, vtype=GRB.CONTINUOUS, name='elec')
+    var_elec = model.addVars(len(index_elec), n_hour, lb=-gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='elec')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
     model.setObjective(gp.quicksum(gp.quicksum(Demands['Offer price'][d][t]*var_dem[d,t] for d in range(n_dem))-gp.quicksum(Generators['Bid price'][g]*var_conv_gen[g,t] for g in range(n_gen))-gp.quicksum(Wind_Farms['Bid price'][wf][t]*var_wf_gen[wf,t] for wf in range(n_wf)) for t in range(n_hour)), GRB.MAXIMIZE)
@@ -123,6 +138,7 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
             # Write lines to the file
             for c in model.getConstrs():
                 file.write(f"{c.ConstrName}: {c.Pi} : {c.Sense} \n")
+                # Get the equilibrium prices for every hours
                 if 'Power balance hour' in c.constrName :
                     equilibrium_prices.append(c.Pi)
         
@@ -136,7 +152,27 @@ def Multiple_hour_optimization(Generators, Wind_Farms, Demands) :
 """ Vizualize result for one hour """
 #####################################
 
-# Function to select the value for only one hour out of the all day
+# This function is only there to help vizualize the results only in one hour of the day.
+# It takes in entry dataframe that contains information for ALL HOURS :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The equilibrium prices for every hour obtained from the dual variable : 'equilibrium_prices'
+    # The selected hour in 'select_hour'
+# And gives as an output information FOR ONE HOUR :
+    # The dataframe 'Generators_hour' with the information about conventional generators for the selected hour
+    # The dataframe 'Wind_Farms_hour' with the information about wind farms for the selected hour
+    # The dataframe 'Demands_hour' with all the demand to fullfill for the selected hour
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen_hour' for the selected hour
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen_hour' for the selected hour
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem_hour' for the selected hour
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec_hour' for the selected hour
+    # The equilibrium prices for every hour obtained from the dual variable : 'equilibrium_price' for the selected hour
+
 def Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, select_hour) :
     Generators_hour = Generators.copy(deep=True)
     Wind_Farms_hour = Wind_Farms.copy(deep=True)
@@ -154,7 +190,22 @@ def Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optim
     equilibrium_price = equilibrium_prices[select_hour-1]
     return(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price)
 
-# Function to put back the capacities and the optimal values in the right order so we can easily have the price 
+# This function is there to put the dataframe in the right order to be able to use the 'Single_hour_plot' and 'Commodities' function of the first step
+# It takes in entry dataframe that contains information FOR ONE HOUR :
+    # The dataframe 'Generators_hour' with the information about conventional generators for the selected hour
+    # The dataframe 'Wind_Farms_hour' with the information about wind farms for the selected hour
+    # The dataframe 'Demands_hour' with all the demand to fullfill for the selected hour
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen_hour' for the selected hour
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen_hour' for the selected hour
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem_hour' for the selected hour
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec_hour' for the selected hour
+    # The equilibrium prices for every hour obtained from the dual variable : 'equilibrium_price' for the selected hour
+# And gives as an output :
+    # The dataframe 'Supply_hour' in the ascending order of bidding price
+    # The dataframe 'Demands_hour' in the descending order of offer price
+    # The list 'optimal_sur_hour' in the right order
+    # The list 'optimal_dem_hour' in the right order
+
 def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour) :
     Generators_hour['Optimal'] = optimal_conv_gen_hour
     Wind_Farms_hour['Optimal'] = optimal_wf_gen_hour
@@ -171,16 +222,14 @@ def Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen
 """ Visualize wind farm and electrolyzer capacity"""
 #####################################################
 
-# You can launch this file and will have two dataframe Electrolizer_1 adnd Electrolizer_2 with different columns :
+# The function is plotting the electrolyzer functioning by taking as an input two dataframe that contains the column :
     # 'Hour' with the hour of the day
     # 'Wind farm capacity' with the total wind electrical capacity
     # 'Electrolyzer capacity' the capacity the electrolyzer is consuming at that time
     # 'Grid provided capacity' the power sent to the grid at that hour
-
-# You can find the total demand per hour in the Dataframe Demand_total with columns :
+# And the dataframe Demand_total that contains the column :
     # 'Hour' with the hour of the day
     # 'Demand' with the total demand at that hour
-    
 
 def plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total):
     fig, ax1 = plt.subplots(figsize=(20, 12))
@@ -233,6 +282,20 @@ def plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total):
 """ Global function """
 #######################
 
+# This function is a global function to compute everything easily for the second step
+# The function will compute the optimization problem and plot all the results we want for every hour of the day
+# It takes in entry dataframes and list that contains information FOR EVERY HOUR :
+    # The dataframe 'Generators' with the information about conventional generators
+    # The dataframe 'Wind_Farms' with the information about wind farms
+    # The dataframe 'Demands' with all the demand to fullfill
+# And gives as an output :
+    # The decision of conventional generating unit in a list of list (nb_hour x nb_gen) : 'optimal_conv_gen'
+    # The decision of wind farms generation for the network in a list of list (nb_hour x nb_wf) : 'optimal_wf_gen'
+    # The decision of fullfilled demand in a list of list (nb_hour x nb_dem) : 'optimal_dem'
+    # The decision of electrolyzer functionning in a list of list (nb_hour x nb_elec): 'optimal_elec'
+    # The equilibrium prices for every hour obtained from the dual variable : 'equilibrium_prices'
+    # The dataframe 'Electrolyzer_1', 'Electrolyzer_2', and 'Demand_total' as described above
+
 def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
     Electrolizer_1 = pd.DataFrame(columns=['Hour', 'Wind farm capacity', 'Electrolyzer capacity', 'Grid provided capacity'])
@@ -256,18 +319,32 @@ def Copper_plate_multi_hour(Generators, Wind_Farms, Demands) :
     final_dataframe = pd.concat(all_dataframes, ignore_index=True)
     final_dataframe.to_excel('output_file.xlsx', index=False)
         
-    return(Electrolizer_1, Electrolizer_2, Demand_total)
+    return(optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, Electrolizer_1, Electrolizer_2, Demand_total)
 
+
+################################
+""" How to use the functions """
+################################
 
 if __name__ == "__main__":     
-    Electrolizer_1, Electrolizer_2, Demand_total = Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
+    #Parameters of our problem
+    # Number of hours (but the data are already considered with 24 hours)
+    n_hour = 24
+    # Index of the electrolyzer, change first numbers to change the place
+    index_elec = {0:0, 1:1}
+    # Hydrogen demand per electrolyser (in tons)
+    Hydro_demand = 20
+    
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, Electrolizer_1, Electrolizer_2, Demand_total = Copper_plate_multi_hour(Generators, Wind_Farms, Demands)
     plot_electrolyzer(Electrolizer_1, Electrolizer_2, Demand_total)
-    # Trying for only one hour    
+    
+    # Trying for only one hour, you can launch this
+    # hour = 1
     # optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices = Multiple_hour_optimization(Generators, Wind_Farms, Demands)
-    # Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, 6)
+    # Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour, optimal_elec_hour, equilibrium_price = Select_one_hour(Generators, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, equilibrium_prices, hour)
     # Supply_hour, Demands_hour, optimal_sup_hour, optimal_dem_hour = Right_order(Generators_hour, Wind_Farms_hour, Demands_hour, optimal_conv_gen_hour, optimal_wf_gen_hour, optimal_dem_hour)
-    # Single_hour_plot(Supply_hour, Demands_hour, clearing_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(1))
-
+    # Single_hour_plot(Supply_hour, Demands_hour, equilibrium_price, optimal_sup_hour, optimal_dem_hour, "Copper_plate_hour_"+str(hour))
+    
 
 
 

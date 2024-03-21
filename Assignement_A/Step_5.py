@@ -1,3 +1,10 @@
+# The goal of this file is to do the step 5 with the balancing market 
+# Example of function call are put at the end 
+
+########################
+""" Relevant modules """
+########################
+
 from Data import Generators, Demands, Wind_Farms
 from Step_1 import Single_hour_plot, Commodities, Single_hour_optimization
 import numpy as np

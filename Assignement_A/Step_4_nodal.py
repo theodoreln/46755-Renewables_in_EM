@@ -297,7 +297,7 @@ def Sensitivity_nodal(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, 
     # First computation with the base case
     optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
     # We keep into memory the nodes equilibrium prices    
-    node_prices = [equilibrium_prices[0,:].tolist()]  # Change the index to match the desired node number
+    node_prices = [equilibrium_prices[0,:].tolist()]  # Node 1 (adjusted index)
     # # Change the transmission capacity 
     Line_capacity[15-1, 21-1] = 400
     Line_capacity[21-1, 15-1] = 400
@@ -348,6 +348,7 @@ def Sensitivity_nodal(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, 
         plt.close()
     else:
         plt.show()
+        Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)
 
 
 ################################
@@ -372,20 +373,16 @@ if __name__ == "__main__":
     # To plot the sensitivity analysis of the study for nodal network
     Sensitivity_nodal(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
 
+
+#If you want to see the solution of the optimization problem in every time step and every node with the constrained lines, please uncomment the following code. 
+#This will allow you to visualize which lines are congested
     
+    # Line_capacity[15-1, 21-1] = 400
+    # Line_capacity[21-1, 15-1] = 400
+    # Line_capacity[14-1, 16-1] = 250
+    # Line_capacity[16-1, 14-1] = 250
+    # Line_capacity[13-1, 23-1] = 250
+    # Line_capacity[23-1, 13-1] = 250
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    # optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_theta, quantity_trade, equilibrium_prices = Nodal_optimization(Generators, Wind_Farms, Demands, Nodes, Line_susceptance, Line_capacity)
+    # Nodal_prices(Nodes, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, quantity_trade, equilibrium_prices)

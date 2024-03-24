@@ -1,10 +1,3 @@
-# The goal of this file is to do the step 5 with the balancing market 
-# Example of function call are put at the end 
-
-########################
-""" Relevant modules """
-########################
-
 from Data import Generators, Demands, Wind_Farms
 from Step_1 import Single_hour_plot, Commodities, Single_hour_optimization
 import numpy as np
@@ -16,86 +9,17 @@ import copy
 import os
 GRB = gp.GRB
 
-# Select only one hour
-hour = 10
-for i in range(len(Demands)) :
-    Demands.loc[i, 'Load'] = Demands['Load'][i][hour-1]
-    Demands.loc[i, 'Offer price'] = Demands['Offer price'][i][hour-1]
-
-# Adding the wind farms
-for i in range(len(Wind_Farms)) :
-    Wind_Farms.loc[i, 'Capacity'] = round(Wind_Farms['Capacity'][i][hour-1],2)
-    Wind_Farms.loc[i, 'Bid price'] = Wind_Farms['Bid price'][i][hour-1]
-Generators = pd.concat([Generators, Wind_Farms], axis=0)
-# Order in ascending orders, necessary for the optimization 
-Generators = Generators.sort_values(by=['Bid price','Name'], ascending=[True, 'Wind farm' in Generators['Name'].values]).reset_index(drop=True)
-# Order in descending orders, necessary for the optimization
-Demands = Demands.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
-
-DA_obj, DA_gen0, DA_dem0, DA_price = Single_hour_optimization(hour,Generators,Demands)
-
-DA_gen = pd.DataFrame({'Name': Generators["Name"], 'Capacity' : Generators['Capacity'], 'Production': DA_gen0, 'Bid price': Generators['Bid price']})
-
-#Dataframe to calculate later the earnings
-BM_clearing = DA_gen[['Name','Production']].copy()
-
-#Conventional generetor that fails
-CG_outage = ['Generator 9']
-
-#Wind farms with lower production
-WF_lower = ['Wind farm 1', 'Wind farm 2', 'Wind farm 3']
-
-#Wind farms with higher production
-WF_higher = ['Wind farm 4', 'Wind farm 5', 'Wind farm 6']
-
-
-#Implementing changes of production to wind farms and setting production of convntional generators that failed to 0
-for name in DA_gen['Name']:
-    if name in CG_outage:
-        DA_gen.loc[DA_gen['Name'] == name, 'Production'] = 0.0
-    if name in WF_lower:
-        DA_gen.loc[DA_gen['Name'] == name, 'Production'] *= 0.9
-    if name in WF_higher:
-        DA_gen.loc[DA_gen['Name'] == name, 'Production'] *= 1.15
-
-#total imbalance  
-Dp = sum(DA_dem0) - DA_gen['Production'].sum()
-
-#Creating new dataframe where only the generators that are elidgible for balancing are included, alongside their remaining capacities
-#and their day ahead prices
-Balancing_gen = DA_gen.copy()
-
-#Removing wind farms, and generators that failed
-for name in Balancing_gen['Name']:
-    if name in CG_outage:
-        Balancing_gen = Balancing_gen[Balancing_gen['Name'] != name]
-    if name in WF_lower:
-        Balancing_gen = Balancing_gen[Balancing_gen['Name'] != name]
-    if name in WF_higher:
-        Balancing_gen = Balancing_gen[Balancing_gen['Name'] != name]
-
-#Generators that can provide up regulation
-Balancing_gen_up = Balancing_gen.copy()
-Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Capacity'] != Balancing_gen_up['Production']] 
-Balancing_gen_up['Capacity'] = Balancing_gen_up['Capacity'] - Balancing_gen_up['Production']
-Balancing_gen_up = Balancing_gen_up.drop('Production', axis=1)
-
-#Generators that can provide down regulation
-Balancing_gen_dw = Balancing_gen.copy()
-Balancing_gen_dw = Balancing_gen_dw[Balancing_gen_dw['Production'] != 0]
-Balancing_gen_dw['Capacity'] = Balancing_gen_dw['Production']
-Balancing_gen_dw = Balancing_gen_dw.drop('Production', axis=1)
-Balancing_gen_dw.reset_index(drop=True, inplace=True)
-
-#implementing the changes on the bidding price
-Balancing_gen_up['Bid price'] = Balancing_gen_up['Bid price']*0.1 + DA_price
-Balancing_gen_dw['Bid price'] = DA_price - Balancing_gen_dw['Bid price']*0.13
-
-#adding curtailment to available demands for up regulation
-curtailment = pd.DataFrame({'Name': 'Curtailment', 'Capacity': sum(DA_dem0), 'Bid price': 400.0}, index=[0])
-Balancing_gen_up = pd.concat([Balancing_gen_up, curtailment], axis=0) 
-#reseting the indexes
-Balancing_gen_up.reset_index(drop=True, inplace=True)
+# This function solves the balacing market problem for a single hour and it being called inside the global function 'Balancing_market_clearing'
+# It takes as inputs:
+    # The selected hour in 'b_hour'
+    # The dataframe 'Generators_up' with the information about conventional generators that can provide up regulation in BM 
+    # The dataframe 'Generators_dw' with the information about conventional generators that can provide down regulation in BM
+    # The system's deviation from DA scheduled production program, after implementing the changes of WFs production and outages of CGs
+# And gives as an output information:
+    # The cost of the system : 'optimal_obj'
+    # The decision of generators providing up regulation in a list : 'optimal_gen_up'
+    # The decision of generators providing down regulation in a list : 'optimal_gen_dw'
+    # The BM's equilibrium price obtained from the dual variable : 'balancing_price'
 
 def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
     # Global variables
@@ -131,7 +55,7 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
 
     #Get the optimal values
     if model.status == GRB.OPTIMAL:
-        # Create a list to store the optimal values of the variables ---> We can also decide to store them back in Generators and Demands ????
+        # Create a list to store the optimal values of the variables
         optimal_gen_up = [var_gen_up[i].X for i in range(n_gen_up)]
         optimal_gen_dw = [var_gen_dw[i].X for i in range(n_gen_dw)]
         # Value of the optimal objective
@@ -171,7 +95,7 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
                     balancing_price = c.Pi
                     
         print("\n")
-        print(f"Equilibrium price : {round(balancing_price,3)} $/MWh\n")
+        print(f"Equilibrium price : {balancing_price} $/MWh")
 
     else:
         print("Optimization did not converge to an optimal solution.")
@@ -179,57 +103,179 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
     # Return the cost and the optimal values
     return(optimal_obj, optimal_gen_up, optimal_gen_dw, balancing_price)
 
-#calling the function
-BM_obj, BM_up, BM_dw, BM_price = Single_hour_balancing(hour,Balancing_gen_up,Balancing_gen_dw, Dp)
 
-Balancing_gen_up['BM production'] = BM_up
-Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Name'] != 'Curtailment']
-Balancing_gen_dw['BM production'] = BM_dw
+# This function is the global function of the Balance market clearing, for a single houre and with intertemporal constraints, but without network constraints
+# It take as inputs for ALL HOURS:
+    # The dataframe 'Generators_BM' with the information about conventional generators
+    # The dataframe 'Demands_BM' with all the demand to fullfill
+    # The dataframe 'Wind_Farms_BM' with the information about wind farms
+    # The selected hour in 'hour'
+    # The selected conventional generators that fail in a list: 'CG_outage'
+    # The selected Wind Farms with lower production than scheduled in a list: 'WF_lower'
+    # The selected Wind Farms with higher production than scheduled in a list: 'WF_higher'
+    # The selected percentage of lower production for Wind Farms in 'WF_down_imbalance'
+    # The selected percentage of higher production for Wind Farms in 'WF_up_imbalance'
+# And gives as an output information FOR ONE HOUR the dataframe 'BM_clearing_output',  that contains:
+    # The name of conventional generators and wind farms in column named 'Name'
+    # The DA scheduled production program, of all generators, in column named 'DA_production'
+    # The DA bid price, of all generators, in column named 'DA_bid_price'
+    # The BM bid price for up regulation, where zero means the respective generator is not capable of up regulation, in column named 'M_bid_price_up'
+    # The BM bid price for down regulation, where zero means the respective generator is not capable of down regulation, in column named 'M_bid_price_dw'
+    # The imbalance concerning the DA scheduled production program in column named 'Imbalance'abs
+    # The up regulation energy provided in column named 'BM_up'
+    # The down regulation energy provided in column named 'BM_dw'abs
+    # The total profits of generator, after DA and Balancing market clearings, based on single-pricing model in column named 'single-price'
+    # The total profits of generator, after DA and Balancing market clearings, based on dual-pricing model in column named 'dual-price'
 
-#Formulating the balancing market dataframe
-BM_clearing.rename(columns={'Production': 'DA_production'}, inplace=True)
-BM_clearing['DA_bid_price'] = [0] * len(BM_clearing)
-BM_clearing = BM_clearing.merge(Balancing_gen_up[['Name', 'Bid price']], on='Name', how='left', suffixes=('', ''))
-BM_clearing = BM_clearing.merge(Balancing_gen_dw[['Name', 'Bid price']], on='Name', how='left', suffixes=('', ' dw'))
-BM_clearing['Imbalance'] = [0] * len(BM_clearing)
-BM_clearing['BM_up'] = [0] * len(BM_clearing)
-BM_clearing['BM_dw'] = [0] * len(BM_clearing)
-BM_clearing['DA_wo_BM'] = [0] * len(BM_clearing)
-BM_clearing['single-price'] = [0] * len(BM_clearing)
-BM_clearing['dual-price'] = [0] * len(BM_clearing)
-BM_clearing.rename(columns={'Bid price': 'BM_bid_price_up', 'Bid price dw': 'BM_bid_price_dw'}, inplace=True)
-BM_clearing.fillna(0, inplace=True)
+def Balancing_market_clearing(Generators_BM, Demands_BM, Wind_Farms_BM, hour, CG_outage, WF_lower, WF_higher, WF_down_imbalance, WF_up_imbalance) :
+    for i in range(len(Demands_BM)) :
+        Demands_BM.loc[i, 'Load'] = Demands_BM['Load'][i][hour-1]
+        Demands_BM.loc[i, 'Offer price'] = Demands_BM['Offer price'][i][hour-1]
 
-for name in BM_clearing['Name'].values:
-    BM_clearing.loc[BM_clearing['Name'] == name, 'DA_bid_price'] = Generators.loc[Generators['Name'] == name, 'Bid price']
+    # Adding the wind farms
+    for i in range(len(Wind_Farms_BM)) :
+        Wind_Farms_BM.loc[i, 'Capacity'] = round(Wind_Farms_BM['Capacity'][i][hour-1],2)
+        Wind_Farms_BM.loc[i, 'Bid price'] = Wind_Farms_BM['Bid price'][i][hour-1]
+    Generators_BM = pd.concat([Generators_BM, Wind_Farms_BM], axis=0)
+    # Order in ascending orders, necessary for the optimization 
+    Generators_BM = Generators_BM.sort_values(by=['Bid price','Name'], ascending=[True, 'Wind farm' in Generators_BM['Name'].values]).reset_index(drop=True)
+    # Order in descending orders, necessary for the optimization
+    Demands_BM = Demands_BM.sort_values(by='Offer price', ascending=False).reset_index(drop=True)
 
-for name in BM_clearing['Name'].values:
-    #Imbalances
-    if name in CG_outage:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']
-    if name in WF_lower:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*WF_down_imbalance
-    if name in WF_higher:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*WF_up_imbalance
+    DA_obj, DA_gen0, DA_dem0, DA_price = Single_hour_optimization(hour,Generators_BM,Demands_BM)
 
-    #Balancing market up & down productions
-    if name in Balancing_gen_up['Name'].values:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'BM_up'] = Balancing_gen_up.loc[Balancing_gen_up['Name'] == name, 'BM production'].values
-    if name in Balancing_gen_dw['Name'].values:
-        BM_clearing.loc[BM_clearing['Name'] == name, 'BM_dw'] = Balancing_gen_dw.loc[Balancing_gen_dw['Name'] == name, 'BM production'].values
+    DA_gen = pd.DataFrame({'Name': Generators_BM["Name"], 'Capacity' : Generators_BM['Capacity'], 'Production': DA_gen0, 'Bid price': Generators_BM['Bid price']})
 
-#single and dual pricing
-for index, row in BM_clearing.iterrows():
-    BM_clearing.loc[index, 'DA_wo_BM'] =  row['DA_production']*(DA_price - row['DA_bid_price'])
-    #we are subtracting DA_bid_price from BM clearing price because DA_bid_price is the marginal cost of the generators
-    BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['DA_bid_price']) 
-    #for dual price we need to distinquish between positive and negative imbalances
-    if row['Imbalance'] > 0:
-        BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*DA_price + row['BM_up']*(BM_price - row['DA_bid_price'])
-    else:
-        BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['DA_bid_price'])
+    #Dataframe to calculate later the earnings
+    BM_clearing = DA_gen[['Name','Production']].copy()
 
-print(BM_clearing)
+    #Implementing changes of pruduction to wind farms and setting production of conventional generators that failed to 0
+    for name in DA_gen['Name']:
+        if name in CG_outage:
+            DA_gen.loc[DA_gen['Name'] == name, 'Production'] = 0.0
+        if name in WF_lower:
+            DA_gen.loc[DA_gen['Name'] == name, 'Production'] *= 1-WF_down_imbalance
+        if name in WF_higher:
+            DA_gen.loc[DA_gen['Name'] == name, 'Production'] *= 1+WF_up_imbalance
+
+    #total imbalance  
+    Dp = sum(DA_dem0) - DA_gen['Production'].sum()
+
+    #Creating new dataframe where only the generators that are elidgible for balancing are included, alongside their remaining capacities
+    #and their day ahead prices
+    Balancing_gen = DA_gen.copy()
+
+    #Removing wind farms, and generators that failed
+    for name in Balancing_gen['Name']:
+        if name in CG_outage:
+            Balancing_gen = Balancing_gen[Balancing_gen['Name'] != name]
+        if name in WF_lower:
+            Balancing_gen = Balancing_gen[Balancing_gen['Name'] != name]
+        if name in WF_higher:
+            Balancing_gen = Balancing_gen[Balancing_gen['Name'] != name]
+
+    #Generators that can provide up regulation
+    Balancing_gen_up = Balancing_gen.copy()
+    Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Capacity'] != Balancing_gen_up['Production']] 
+    Balancing_gen_up['Capacity'] = Balancing_gen_up['Capacity'] - Balancing_gen_up['Production']
+    Balancing_gen_up = Balancing_gen_up.drop('Production', axis=1)
+
+    #Generators that can provide down regulation
+    Balancing_gen_dw = Balancing_gen.copy()
+    Balancing_gen_dw = Balancing_gen_dw[Balancing_gen_dw['Production'] != 0]
+    Balancing_gen_dw['Capacity'] = Balancing_gen_dw['Production']
+    Balancing_gen_dw = Balancing_gen_dw.drop('Production', axis=1)
+    Balancing_gen_dw.reset_index(drop=True, inplace=True)
+
+    #implementing the changes on the bidding price
+    Balancing_gen_up['Bid price'] = Balancing_gen_up['Bid price']*0.1 + DA_price
+    Balancing_gen_dw['Bid price'] = DA_price - Balancing_gen_dw['Bid price']*0.13
+
+    #adding curtailment to available generators for up regulation
+    curtailment = pd.DataFrame({'Name': 'Curtailment', 'Capacity': sum(DA_dem0), 'Bid price': 400.0}, index=[0])
+    Balancing_gen_up = pd.concat([Balancing_gen_up, curtailment], axis=0) 
+    #reseting the indexes
+    Balancing_gen_up.reset_index(drop=True, inplace=True)
+
+    #calling the function Single_hour_balancing
+    BM_obj, BM_up, BM_dw, BM_price = Single_hour_balancing(hour,Balancing_gen_up,Balancing_gen_dw, Dp)
+
+    Balancing_gen_up['BM production'] = BM_up
+    Balancing_gen_up = Balancing_gen_up[Balancing_gen_up['Name'] != 'Curtailment']
+    Balancing_gen_dw['BM production'] = BM_dw
+
+    #Formulating the balancing market dataframe
+    BM_clearing.rename(columns={'Production': 'DA_production'}, inplace=True)
+    BM_clearing['DA_bid_price'] = [0] * len(BM_clearing)
+    BM_clearing = BM_clearing.merge(Balancing_gen_up[['Name', 'Bid price']], on='Name', how='left', suffixes=('', ''))
+    BM_clearing = BM_clearing.merge(Balancing_gen_dw[['Name', 'Bid price']], on='Name', how='left', suffixes=('', ' dw'))
+    BM_clearing['Imbalance'] = [0] * len(BM_clearing)
+    BM_clearing['BM_up'] = [0] * len(BM_clearing)
+    BM_clearing['BM_dw'] = [0] * len(BM_clearing)
+    BM_clearing['DA_wo_BM'] = [0] * len(BM_clearing)
+    BM_clearing['single-price'] = [0] * len(BM_clearing)
+    BM_clearing['dual-price'] = [0] * len(BM_clearing)
+    BM_clearing.rename(columns={'Bid price': 'BM_bid_price_up', 'Bid price dw': 'BM_bid_price_dw'}, inplace=True)
+    BM_clearing.fillna(0, inplace=True)
+
+    #incorporating the DA bid prices (marginal costs of generators)
+    for name in BM_clearing['Name'].values:
+        BM_clearing.loc[BM_clearing['Name'] == name, 'DA_bid_price'] = Generators_BM.loc[Generators_BM['Name'] == name, 'Bid price']
+
+    for name in BM_clearing['Name'].values:
+        #Imbalances
+        if name in CG_outage:
+            BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']
+        if name in WF_lower:
+            BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = -BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*WF_down_imbalance
+        if name in WF_higher:
+            BM_clearing.loc[BM_clearing['Name'] == name, 'Imbalance'] = BM_clearing.loc[BM_clearing['Name'] == name, 'DA_production']*WF_up_imbalance
+
+        #Balancing market up & down productions
+        if name in Balancing_gen_up['Name'].values:
+            BM_clearing.loc[BM_clearing['Name'] == name, 'BM_up'] = Balancing_gen_up.loc[Balancing_gen_up['Name'] == name, 'BM production'].values
+        if name in Balancing_gen_dw['Name'].values:
+            BM_clearing.loc[BM_clearing['Name'] == name, 'BM_dw'] = Balancing_gen_dw.loc[Balancing_gen_dw['Name'] == name, 'BM production'].values
+
+    #single and dual pricing
+    for index, row in BM_clearing.iterrows():
+        BM_clearing.loc[index, 'DA_wo_BM'] =  row['DA_production']*(DA_price - row['DA_bid_price'])
+        #we are subtracting DA_bid_price from BM clearing price because DA_bid_price is the marginal cost of the generators
+        BM_clearing.loc[index, 'single-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['DA_bid_price']) 
+        #for dual price we need to distinquish between positive and negative imbalances
+        if row['Imbalance'] > 0:
+            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*DA_price + row['BM_up']*(BM_price - row['DA_bid_price'])
+        else:
+            BM_clearing.loc[index, 'dual-price'] = row['DA_production']*(DA_price - row['DA_bid_price']) + row['Imbalance']*BM_price + row['BM_up']*(BM_price - row['DA_bid_price'])
+    
+    return(BM_clearing)
+
+
+
+if __name__ == "__main__": 
+    # Select only one hour
+    hour_input = 10
+
+    #Conventional generetors that fails
+    CG_outage_input = ['Generator 9']
+
+    #Wind farms with lower production
+    WF_lower_input = ['Wind farm 1', 'Wind farm 2', 'Wind farm 3']
+
+    #Wind farms with higher production
+    WF_higher_input = ['Wind farm 4', 'Wind farm 5', 'Wind farm 6']
+
+    #Wind farm imbalances on percentages
+    WF_down_imbalance_input = 0.1
+    WF_up_imbalance_input = 0.15
+
+    BM_clearing_output = Balancing_market_clearing(Generators, Demands, Wind_Farms,hour_input, CG_outage_input, WF_lower_input, WF_higher_input, WF_down_imbalance_input, WF_up_imbalance_input)
+
+    print(BM_clearing_output)
+
+
+
+
 
 
 # Plotting the solution of the clearing for an hour and demands and generators entries
@@ -299,4 +345,4 @@ def Balancing_plot(hour, Balancing_gen_dw, Balancing_gen_up, Dp, BM_price) :
     plt.savefig(pdf_filename,  bbox_inches='tight')
     plt.show()
     
-Balancing_plot(hour, Balancing_gen_dw, Balancing_gen_up, Dp, BM_price)
+#Balancing_plot(hour, Balancing_gen_dw, Balancing_gen_up, Dp, BM_price)

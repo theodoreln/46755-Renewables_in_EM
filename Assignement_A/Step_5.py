@@ -104,7 +104,7 @@ def Single_hour_balancing(b_hour,Generators_up, Generators_dw, Imbalance) :
     return(optimal_obj, optimal_gen_up, optimal_gen_dw, balancing_price)
 
 
-# This function is the global function of the Balance market clearing, for a single houre and with intertemporal constraints, but without network constraints
+# This function is the global function of the Balance market clearing, for a single hour, disregarding network constraints
 # It take as inputs for ALL HOURS:
     # The dataframe 'Generators_BM' with the information about conventional generators
     # The dataframe 'Demands_BM' with all the demand to fullfill

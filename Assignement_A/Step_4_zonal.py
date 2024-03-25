@@ -298,8 +298,6 @@ def Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones, Case) :
         Zones_case = 0
         Zones_case = Transmission_input(Zones, Case[i])
         optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones_case)
-        if i == 1 :
-            Zonal_transmission_prices(Zones_case, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
         Prices.append(equilibrium_prices)
         
     # Plot the sensitivity analysis of the zonal prices
@@ -340,20 +338,21 @@ if __name__ == "__main__":
     Hydro_demand = 20
     
     
-    # When you want only one case, and to have the output text file
-    T_2 = [[1,2,1000,1000]]
-    T_3 = [[1,2,500,1000],[2,3,500,1000]] 
+    # Case for 2 zones, we don't need it 
+    # T_2 = [[1,2,1000,1000]]
+    # Zones_2 = Transmission_input(Zones_2, T_2)  
     
-    # Put inside of the dictionnary, the right lines configuration
-    Zones_2 = Transmission_input(Zones_2, T_2)  
-    Zones_3 = Transmission_input(Zones_3, T_3)   
     
-    # Launching only 3 zones for example            
-    Zones = Zones_3
-    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones)
-    Zonal_transmission_prices(Zones, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
+    # If you want to launch only one case for 3 zones and have the text file with the results
+    # Modify this file to adjust the lines :
+    T_3 = [[1,2,1000,1000],[2,3,1000,1000]] 
+    Zones_3_ex = copy.deepcopy(Zones_3)
+    Zones_3_ex = Transmission_input(Zones_3_ex, T_3)   
+    optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices = Zonal_optimization(Generators, Wind_Farms, Demands, Zones_3_ex)
+    Zonal_transmission_prices(Zones_3_ex, Generators, Wind_Farms, Demands, optimal_conv_gen, optimal_wf_gen, optimal_dem, optimal_elec, optimal_trans, equilibrium_prices)
     
-    # For the sensitivity analysis, you put two different configuraration, the first one is the base case
+    
+    # For the sensitivity analysis, you put two different configuraration, the first one is the base case and the second one is the one you want to study, will not provide the text file, for that, use the functions above
     Case = [[[1,2,1000,1000],[2,3,1000,1000]], [[1,2,100,100],[2,3,100,100], [1,3,500,500]]]
     Sensitivity_zonal(Generators, Wind_Farms, Demands, Zones_3, Case)
     

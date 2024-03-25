@@ -53,7 +53,7 @@ File for clearing a DA market where the prices are based on nodal pricing system
 2) Nodal_prices
     A function which writes the results of the 'Nodal_optimization' function into a text file, where they can be read through and processed.
 3) Sensitivity_nodal
-	Basically a function where 'Nodal_optimization' and 'Nodal_prices' functions are used, and different line capacities are tested in order to conduct a sensitivity analysis. The values can be changed inside the functiion itself.
+    Basically a plot function where 'Nodal_optimization' function is used and different line capacities are tested in order to conduct a sensitivity analysis. The values can be changed inside the functiion itself, and the plot generated is specifically for the scenario that is incorporated inside the report. If more cases were to be tested, it can be done by the very end of the file by uncommenting the highlighted section.
 
 ----------------------------
 ----------------------------

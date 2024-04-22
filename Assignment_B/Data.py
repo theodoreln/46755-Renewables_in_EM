@@ -68,17 +68,24 @@ DA_price = [
     [76.01 , 70.44 , 65.76 , 58.81 , 60 , 66.77 , 93.3 , 103.15 , 98.92 , 70.84 , 61.75 , 57.18 , 62.48 , 65.49 , 59.09 , 64.08 , 71.27 , 97.86 , 144.85 , 141.56 , 115.15 , 99.38 , 82.9 , 78.92]
     ]
 
-#24 random binary variables which will be used to represent the status of power system (excess or deficit)
-PS_need = np.random.binomial(n=1, p=0.5, size=24)
+#3 random sets of 24 binary variables, created with bernouli distribution
+PS_need = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+    [1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1],
+    [0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1]]
 
-#Arbitrarily selecting the in sample scenarios and creating a dataframe with them 
-no_sample = 250
-no_lists = []
 
-for t in range(no_sample):
-    no_lists.append([random.choice(DA_forecast), random.choice(DA_price), random.choice(PS_need)])
+#Creating 1200 scenarios
+scenarios = []
+for t1 in DA_forecast:
+    for t2 in DA_price:
+        for t3 in PS_need:
+            scenarios.append([t1, t2, t3])
 
-in_sample = pd.DataFrame (no_lists, columns=['DA_forecast','DA_price','Binary_var'])
+
+#Selecting 250 random scenarios for 'in sample' scenarios case, and creating a dataframe with them
+random.seed(123)
+in_sample = pd.DataFrame (random.sample(scenarios,250), columns=['DA_forecast','DA_price','Binary_var'])
 
 
 

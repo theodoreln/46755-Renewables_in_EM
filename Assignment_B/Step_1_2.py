@@ -164,9 +164,7 @@ def Profits_scenarios(in_sample, optimal_qu_off, price_scheme) :
         profit[w] = profit_w
     
     return(profit)
-    
-profit_one = Profits_scenarios(in_sample, optimal_qu_off_one, 1)
-profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2)
+
 
 def Show_distribution(profit, nb_bins) :
     
@@ -180,9 +178,12 @@ def Show_distribution(profit, nb_bins) :
     
     # Display the plot
     plt.show()
-    
-Show_distribution(profit_one, 80)
-Show_distribution(profit_two, 80)
+
+if __name__ == "__main__":
+    profit_one = Profits_scenarios(in_sample, optimal_qu_off_one, 1)
+    profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2)
+    Show_distribution(profit_one, 80)
+    Show_distribution(profit_two, 80)
 
 
 

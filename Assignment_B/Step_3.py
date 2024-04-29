@@ -176,9 +176,9 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
     
     return(expected_value, cvar)
     
-
-expected_value, cvar = beta_iteration(in_sample, 1, 0.5, 0.01)
-expected_value, cvar = beta_iteration(in_sample, 2, 0.5, 0.01)
+if __name__ == "__main__":
+    expected_value, cvar = beta_iteration(in_sample, 1, 0.5, 0.01)
+    expected_value, cvar = beta_iteration(in_sample, 2, 0.5, 0.01)
 
 
 

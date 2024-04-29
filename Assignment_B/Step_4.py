@@ -175,31 +175,94 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
     plt.show()
     
     return(expected_value, cvar,_)
+
+def Show_distribution(profit, nb_bins) :
+    
+    # Create histogram
+    plt.hist(profit, bins=nb_bins, color='blue', edgecolor='black')
+    
+    # Add labels and title
+    plt.xlabel('Profit')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of profits')
+    
+    # Display the plot
+    plt.show()
     
 
-expected_value, cvar, optimal_qu_off = beta_iteration(in_sample, 1, 0.5, 0.01)
+#expected_value, cvar, optimal_qu_off = beta_iteration(in_sample, 1, 0.5, 0.01)
 #expected_value, cvar, optimal_qu_off = beta_iteration(in_sample, 2, 0.5, 0.01)
 
+price_scheme=1
 
+
+if price_scheme == 1 : 
+    optimal_qu_off, optimal_obj, cvar_value = Offering_one_price_risk(in_sample, 0.5)
+elif price_scheme == 2 :
+    optimal_qu_off, optimal_obj, cvar_value = Offering_two_price_risk(in_sample, 0.5)
+    
 
 n_scen=len(in_sample)
 n_out_scen=len(out_of_sample)
 n_hour=24
 
+delta=np.zeros((n_out_scen, n_hour))
+delta_up=np.zeros((n_out_scen, n_hour))
+delta_down=np.zeros((n_out_scen, n_hour))
+DA_profit=np.zeros(n_out_scen)
+total_revenue_out=np.zeros(n_out_scen)
 
 # Calculate revenue from the Day-Ahead market
-day_ahead_revenue = sum([(1/n_out_scen)*out_of_sample['DA_price'][w][t] * optimal_qu_off[t] for w in range(n_out_scen) for t in range(n_hour)])
 
-print("Day-Ahead Revenue:", day_ahead_revenue)
+for w in range(n_out_scen) :
+    profit_w = 0
+    for t in range(n_hour) :
+        profit_w +=out_of_sample['DA_price'][w][t]*optimal_qu_off[t]  
 
-y = (1/n_out_scen)*sum((sum((out_of_sample['Binary_var'][w][t] * 0.9 * out_of_sample['DA_price'][w][t] * (out_of_sample['DA_forecast'][w][t] - optimal_qu_off[t])
+    # Save the DA profit for scenario w
+    DA_profit[w] = profit_w
+    
+#day_ahead_revenue = sum([(1/n_out_scen)*out_of_sample['DA_price'][w][t] * optimal_qu_off[t] for w in range(n_out_scen) for t in range(n_hour)])
+#print("Day-Ahead Revenue:", day_ahead_revenue)
+
+if price_scheme==1:
+    y = (1/n_out_scen)*sum((sum((out_of_sample['Binary_var'][w][t] * 0.9 * out_of_sample['DA_price'][w][t] * (out_of_sample['DA_forecast'][w][t] - optimal_qu_off[t])
         + (1 - out_of_sample['Binary_var'][w][t]) * 1.2 * out_of_sample['DA_price'][w][t] * (out_of_sample['DA_forecast'][w][t] - optimal_qu_off[t])) for w in range(n_out_scen)) for t in range(n_hour)))
 
+if price_scheme==2:
 
-total_revenue_out=y+day_ahead_revenue
-print("Total Out Revenue: ",total_revenue_out)
+    #delta[w][t] = [out_of_sample['DA_forecast'][w][t] - optimal_qu_off[t] for w in range(n_out_scen) for t in range(n_hour)]
+ 
+    for w in range(n_out_scen):
+        for t in range(n_hour):
+            
+            delta[w][t] = out_of_sample['DA_forecast'][w][t] - optimal_qu_off[t]
+         
+            
+            if delta[w][t]<0:
+                delta_up[w][t]=0
+                delta_down[w][t]=-delta[w][t]
+            if delta[w][t]>0:
+                delta_up[w][t]=delta[w][t]
+                delta_down[w][t]=0
+            if delta[w][t]==0:
+                delta_up[w][t]=0
+                delta_down[w][t]=0
+                
+    
+    y = (1 / n_out_scen) * sum(sum((out_of_sample['Binary_var'][w][t] * (0.9 * out_of_sample['DA_price'][w][t] * delta_up[w][t] - out_of_sample['DA_price'][w][t] * delta_down[w][t])
+                                + (1 - out_of_sample['Binary_var'][w][t]) * (out_of_sample['DA_price'][w][t] * delta_up[w][t] - 1.2 * out_of_sample['DA_price'][w][t] * delta_down[w][t])) for w in range(n_out_scen)) for t in range(n_hour))
 
 
+for w in range(n_out_scen):
+    
+    total_revenue_out[w]=y+DA_profit[w]
+    
+#print("Y: ",y)
+#print("Total Out Revenue: ",total_revenue_out)
+
+
+Show_distribution(total_revenue_out, 80)
 
 
 

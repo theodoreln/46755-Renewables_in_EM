@@ -188,7 +188,7 @@ n_hour=24
 
 
 # Calculate revenue from the Day-Ahead market
-day_ahead_revenue = sum([(1/n_scen)*out_of_sample['DA_price'][w][t] * optimal_qu_off[t] for w in range(n_scen) for t in range(n_hour)])
+day_ahead_revenue = sum([(1/n_out_scen)*out_of_sample['DA_price'][w][t] * optimal_qu_off[t] for w in range(n_out_scen) for t in range(n_hour)])
 
 print("Day-Ahead Revenue:", day_ahead_revenue)
 

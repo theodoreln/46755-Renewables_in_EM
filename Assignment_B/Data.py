@@ -89,6 +89,11 @@ random.seed(123)
 in_sample = pd.DataFrame (random.sample(scenarios,250), columns=['DA_forecast','DA_price','Binary_var'])
 
 
+# List of remaining scenarios
+remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
+
+# remaining 950
+out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
 
 
 

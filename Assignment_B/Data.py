@@ -97,5 +97,36 @@ out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_pr
 
 
 
+# Generating scenarios for future stochastic load
+sto_anc_scenarios = [0]*200
+for i in range(200) :
+    scen = [0]*60
+    for j in range(60) :
+        if j == 0 :
+            scen[j] = round(random.uniform(200,500),2)
+        else :
+            step = round(random.uniform(-25,25),2)
+            new_value = scen[j-1]+step
+            if new_value < 200 :
+                scen[j] = 200
+            elif new_value > 500 :
+                scen[j] = 500
+            else :
+                scen[j] = round(new_value,2)
+    sto_anc_scenarios[i] = scen
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

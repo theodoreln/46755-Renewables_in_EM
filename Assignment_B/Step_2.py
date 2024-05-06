@@ -12,6 +12,7 @@ import gurobipy as gp
 import os
 GRB = gp.GRB
 from Data import sto_anc_scenarios
+from matplotlib.colors import ListedColormap
 
 ###########################
 """ Scenarios selection """
@@ -53,6 +54,9 @@ def P90_ALSO_X(in_sample, epsilon) :
         for m in range(n_min) :
             model.addConstr(var_qu_off - in_sample[s][m] <= var_bin[s,m]*100000)
     model.addConstr(gp.quicksum(gp.quicksum(var_bin[s,m] for m in range(n_min)) for s in range(n_scen)) <= epsilon*n_scen*n_min)
+    
+    # Set Gurobi parameter to suppress output
+    model.setParam('OutputFlag', 0) 
     
     #Solve the problem
     model.optimize()
@@ -97,6 +101,9 @@ def P90_CVAR(in_sample,epsilon) :
             model.addConstr(var_beta <= var_zeta[s,m])
     model.addConstr((1/(n_scen*n_min))*gp.quicksum(gp.quicksum(var_zeta[s,m] for m in range(n_min)) for s in range(n_scen)) <= (1-epsilon)*var_beta)
     
+    # Set Gurobi parameter to suppress output
+    model.setParam('OutputFlag', 0)
+    
     #Solve the problem
     model.optimize()
     
@@ -112,8 +119,8 @@ def P90_CVAR(in_sample,epsilon) :
     return(optimal_qu_off)
 
 
-optimal_qu_off_ALSO_X = P90_ALSO_X(sto_anc_in_sample, 0.1)
-optimal_qu_off_CVAR = P90_CVAR(sto_anc_in_sample, 0.1)
+# optimal_qu_off_ALSO_X = P90_ALSO_X(sto_anc_in_sample, 0.1)
+# optimal_qu_off_CVAR = P90_CVAR(sto_anc_in_sample, 0.1)
 
 
 #######################################################
@@ -130,6 +137,8 @@ def P90_verify(optimal_qu_off, out_of_sample, epsilon) :
     
     # Stock when there is a power shortage, for a given minute, for a given scenarios
     shortage = []
+    # Stock weither (1) or not (0) the quantity verify the P90 rule
+    decision = 0
     
     for s in range(n_scen) :
         short = [0]*n_min
@@ -141,13 +150,119 @@ def P90_verify(optimal_qu_off, out_of_sample, epsilon) :
                 
     total_pos = epsilon*n_scen*n_min
     if def_count > total_pos :
+        decision = 0
         print(f"P90 rule is not fullfilled for {optimal_qu_off} kW offered")
     else :
+        decision = 1
         print(f"P90 is fullfilled for {optimal_qu_off} kW offered")
     
-    return(shortage)
+    return(shortage, def_count, decision)
     
-shortage = P90_verify(optimal_qu_off_ALSO_X, sto_anc_out_of_sample, 0.1)
+# shortage, def_count, decision = P90_verify(optimal_qu_off_ALSO_X, sto_anc_out_of_sample, 0.1)
+# shortage, def_count, decision = P90_verify(optimal_qu_off_CVAR, sto_anc_out_of_sample, 0.1)
+
+def Shortage_plot(in_sample, out_of_sample, epsilon) :
+    # Number of minute
+    n_min = 60
+    # List of minutes
+    minutes = list(range(1, n_min+1))
+    
+    # Create a list to store the average value of shortage for a given minute
+    avg_short_in_ALSO_X = [0]*n_min
+    avg_short_in_CVAR = [0]*n_min
+    avg_short_out_ALSO_X = [0]*n_min
+    avg_short_out_CVAR = [0]*n_min
+    
+    # In sample offering decisions
+    optimal_qu_off_ALSO_X = P90_ALSO_X(in_sample, epsilon)
+    optimal_qu_off_CVAR = P90_CVAR(in_sample, epsilon)
+    
+    # Shortages computation
+    shortage_in_ALSO_X, def_count_in_ALSO_X, decision_in_ALSO_X = P90_verify(optimal_qu_off_ALSO_X, in_sample, epsilon)
+    shortage_in_CVAR, def_count_in_CVAR, decision_in_CVAR = P90_verify(optimal_qu_off_CVAR, in_sample, epsilon)
+    shortage_out_ALSO_X, def_count_out_ALSO_X, decision_out_ALSO_X = P90_verify(optimal_qu_off_ALSO_X, out_of_sample, epsilon)
+    shortage_out_CVAR, def_count_out_CVAR, decision_out_CVAR = P90_verify(optimal_qu_off_CVAR, out_of_sample, epsilon)
+    
+    # Average shortage per minute
+    for m in range(n_min) :
+        for s in range(len(in_sample)) :
+            avg_short_in_ALSO_X[m] += shortage_in_ALSO_X[s][m]
+            avg_short_in_CVAR[m] += shortage_in_CVAR[s][m]
+        avg_short_in_ALSO_X[m] = avg_short_in_ALSO_X[m]/len(in_sample)
+        avg_short_in_CVAR[m] = avg_short_in_CVAR[m]/len(in_sample)
+    for m in range(n_min) :
+        for s in range(len(out_of_sample)) :
+            avg_short_out_ALSO_X[m] += shortage_out_ALSO_X[s][m]
+            avg_short_out_CVAR[m] += shortage_out_CVAR[s][m]
+        avg_short_out_ALSO_X[m] = avg_short_out_ALSO_X[m]/len(out_of_sample)
+        avg_short_out_CVAR[m] = avg_short_out_CVAR[m]/len(out_of_sample)
+    # Standard deviation
+    shortage_in_ALSO_X_array = np.array(shortage_in_ALSO_X)
+    shortage_in_CVAR_array = np.array(shortage_in_CVAR)
+    shortage_out_ALSO_X_array = np.array(shortage_out_ALSO_X)
+    shortage_out_CVAR_array = np.array(shortage_out_CVAR)
+    sd_in_ALSO_X = np.std(shortage_in_ALSO_X_array, axis=0)
+    sd_in_CVAR = np.std(shortage_in_CVAR_array, axis=0)
+    sd_out_ALSO_X = np.std(shortage_out_ALSO_X_array, axis=0)
+    sd_out_CVAR = np.std(shortage_out_CVAR_array, axis=0)
+    
+    # Plotting of lines of average shortage
+    plt.figure(figsize = (10, 7))
+    plt.rcParams["font.size"] = 12
+        
+    plt.plot(minutes, avg_short_in_ALSO_X, 'cornflowerblue', label="ALSO_X in sample")
+    plt.plot(minutes, avg_short_out_ALSO_X, 'navy', label="ALSO_X out of sample")
+    plt.plot(minutes, avg_short_in_CVAR, 'darkorange', label="CVaR in sample")
+    plt.plot(minutes, avg_short_out_CVAR, 'red', label="CVaR out of sample")
+    # plt.fill_between(minutes, avg_short_in_ALSO_X - sd_in_ALSO_X, avg_short_in_ALSO_X + sd_in_ALSO_X, color='cornflowerblue', alpha=0.2)
+    # plt.fill_between(minutes, avg_short_out_ALSO_X - sd_out_ALSO_X, avg_short_out_ALSO_X + sd_out_ALSO_X, color='navy', alpha=0.2)
+    # plt.fill_between(minutes, avg_short_in_CVAR - sd_in_CVAR, avg_short_in_CVAR + sd_in_CVAR, color='darkorange', alpha=0.2)
+    # plt.fill_between(minutes, avg_short_out_CVAR - sd_out_CVAR, avg_short_out_CVAR + sd_out_CVAR, color='red', alpha=0.2)
+    plt.xlabel('Minute in Hour')
+    plt.ylabel('Average power shortage [MW]')
+    plt.legend(loc=1)
+    plt.show()
+    
+    # Plotting bar of number of shortage 
+    # Define the situations and their corresponding values
+    situations = ['ALSO_X in sample', 'CVAR in sample', 'ALSO_X out of sample', 'CVAR out of sample']
+    values = [def_count_in_ALSO_X, def_count_in_CVAR, def_count_out_ALSO_X, def_count_out_CVAR]  # Example values for each situation
+    
+    # Define colors for each bar
+    colors1 = ['cornflowerblue', 'darkorange']  # Colors for the first subplot
+    colors2 = ['navy', 'red']    # Colors for the second subplot
+    
+    # Define specific values for the red horizontal bars
+    red_line = [epsilon*len(in_sample)*n_min, epsilon*len(out_of_sample)*n_min]
+    
+    # Create a figure and two subplots side by side
+    fig, axs = plt.subplots(1, 2, figsize=(10, 7))
+    plt.rcParams["font.size"] = 12
+    
+    # First subplot with the first two bars
+    axs[0].bar(situations[:2], values[:2], color=colors1)
+    axs[0].set_title('In sample')
+    axs[0].set_ylabel('Number of power shortage')
+    
+    # Add red horizontal bar with specific value
+    axs[0].axhline(y=red_line[0], color='red', linestyle='-', linewidth=1, label='P90 rule')
+    axs[0].legend(loc=1)
+    
+    # Second subplot with the last two bars
+    axs[1].bar(situations[2:], values[2:], color=colors2)
+    axs[1].set_title('Out of sample')
+    axs[1].set_ylabel('Number of power shortage')
+    
+    # Add red horizontal bar with specific value
+    axs[1].axhline(y=red_line[1], color='red', linestyle='-', linewidth=1, label='P90 rule')
+    axs[1].legend(loc=1)
+    
+    # Show the graph
+    plt.tight_layout()
+    plt.show()
+    
+
+Shortage_plot(sto_anc_in_sample, sto_anc_out_of_sample, 0.1)
 
 
 ###########################################################
@@ -196,16 +311,108 @@ def Plotting_CFD(sample, qu_off) :
     plt.show()
 
 
-Plotting_CFD(sto_anc_out_of_sample, optimal_qu_off_ALSO_X)
+# Plotting_CFD(sto_anc_out_of_sample, optimal_qu_off_ALSO_X)
+# Plotting_CFD(sto_anc_out_of_sample, optimal_qu_off_CVAR)
 
 
+##################################################################
+""" Plotting the effect of epsilon choosing on the missing kWh """
+##################################################################
+
+def Effect_epsilon(in_sample, out_of_sample) :
+    # List of values for data generation
+    epsilon_values = np.arange(0, 0.6, 0.05)
+    Qu_off = np.zeros(len(epsilon_values))
+    
+    
+    # 
 
 
+##########################################################################
+""" Heat Map for making Energinet rule and number of in_sample varying """
+##########################################################################
 
+def Heat_map(sto_anc_scenarios) :
+    #Generate the data for the heat map
+    # Lists for data generation
+    sample_values = np.arange(10, 210, 20)
+    epsilon_values = np.arange(0, 0.6, 0.1)
+    
+    # Table with values of offered quantity
+    Off_qu = np.zeros((len(epsilon_values), len(sample_values)))
+    # Table with the values of verification
+    Verif = np.zeros((len(epsilon_values), len(sample_values)))
+    Numb_shortage = np.zeros((len(epsilon_values), len(sample_values)))
+    
+    # Get the data for the plotting
+    for i in range(len(sample_values)):
+        for j in range(len(epsilon_values)) :
+            print(f"\n Sample : {sample_values[i]} and Epsilon : {epsilon_values[j]}")
+            sample = sample_values[i]
+            epsilon = epsilon_values[j]
+            # Selecting scenarios
+            in_sample = random.sample(sto_anc_scenarios,sample)
+            out_of_sample = [scenario for scenario in sto_anc_scenarios if scenario not in in_sample]
+            # Computing the offered value
+            Off_qu[j,i] = P90_ALSO_X(in_sample, epsilon)
+            # Verifying Energinet rule
+            _, Numb_shortage[j,i], Verif[j,i] = P90_verify(Off_qu[j,i], out_of_sample, epsilon)
+            Numb_shortage[j,i] = Numb_shortage[j,i]/len(out_of_sample)
+            
+    
+    #Plotting the thing
+    
+    # Create a grid of squares
+    x, y = np.meshgrid(sample_values, epsilon_values)
+    
+    # Plot the grid with colors representing the binary values of the third property
+    plt.figure(figsize=(10, 5))
+    plt.rcParams["font.size"] = 12
+    
+    # With percentage of shortage
+    plt.pcolormesh(x, y, Numb_shortage, cmap='viridis', shading='auto')
+    # Add color scale on the right side
+    plt.colorbar(label='Percentage of power shortage [%]')
+    # Add text annotations to each square
+    for i in range(len(sample_values)):
+        for j in range(len(epsilon_values)):
+            plt.text(sample_values[i], epsilon_values[j], f'{Off_qu[j,i]}',
+                     ha='center', va='center', color='black', fontsize=10)
+    plt.xlabel('Number of in sample scenarios selected')
+    plt.ylabel('Epsilon')
+    # Remove horizontal grid lines
+    plt.grid(axis='y', linestyle='')
+    plt.show()
+    
+    #Plotting the thing
+    # Define colors for binary values (0: red, 1: green)
+    colors = ['red', 'green']
+    cmap = ListedColormap(colors)
+    
+    # Create a grid of squares
+    x, y = np.meshgrid(sample_values, epsilon_values)
+    
+    # Plot the grid with colors representing the binary values of the third property
+    plt.figure(figsize=(10, 5))
+    plt.rcParams["font.size"] = 12
+    
+    # With if it respect or not
+    plt.pcolormesh(x, y, Verif, cmap=cmap, shading='auto')
+    # Add text annotations to each square
+    for i in range(len(sample_values)):
+        for j in range(len(epsilon_values)):
+            plt.text(sample_values[i], epsilon_values[j], f'{Off_qu[j,i]}',
+                     ha='center', va='center', color='black', fontsize=10)
+    plt.xlabel('Number of in sample scenarios selected')
+    plt.ylabel('Epsilon')
+    # Remove horizontal grid lines
+    plt.grid(axis='y', linestyle='')
+    plt.show()
+    
+    return(Off_qu, Verif)
 
-
-
-
+# random.seed(456)
+# Off_qu, Verif = Heat_map(sto_anc_scenarios)
 
 
 

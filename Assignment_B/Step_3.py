@@ -37,8 +37,8 @@ def Offering_one_price_risk(in_sample, beta) :
     var_eta = model.addVars(n_scen, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='eta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
-    model.setObjective(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] + in_sample['Binary_var'][w][t]*0.9*in_sample['DA_price'][w][t]*var_qu_diff[t,w]
-                                                           + (1-in_sample['Binary_var'][w][t])*1.2*in_sample['DA_price'][w][t]*var_qu_diff[t,w]) for w in range(n_scen)) for t in range(n_hour))
+    model.setObjective((1-beta)*(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] + in_sample['Binary_var'][w][t]*0.9*in_sample['DA_price'][w][t]*var_qu_diff[t,w]
+                                                           + (1-in_sample['Binary_var'][w][t])*1.2*in_sample['DA_price'][w][t]*var_qu_diff[t,w]) for w in range(n_scen)) for t in range(n_hour)))
                        + beta*(var_zeta - 1/(1-0.90)*gp.quicksum((1/n_scen)*var_eta[w] for w in range(n_scen))), GRB.MAXIMIZE)
     
     #Add constraints to the model
@@ -64,10 +64,12 @@ def Offering_one_price_risk(in_sample, beta) :
         
         # Create a list to store the optimal values of the variables
         optimal_qu_off = [round(var_qu_off[t].X,2) for t in range(n_hour)]
-        # Value of the optimal objective
-        optimal_obj = model.ObjVal
+
         # Compute CVAR
         cvar = var_zeta.X - (1/(1-0.9))*(1/n_scen)*sum([var_eta[w].X for w in range(n_scen)])
+
+        # Value of the optimal objective
+        optimal_obj = (model.ObjVal - beta*cvar)/(1-beta)
     
     else:
         print("Optimization did not converge to an optimal solution.")
@@ -102,10 +104,10 @@ def Offering_two_price_risk(in_sample, beta) :
     var_eta = model.addVars(n_scen, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='eta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
-    model.setObjective(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] 
+    model.setObjective((1-beta)*(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] 
                                                            + in_sample['Binary_var'][w][t]*(0.9*in_sample['DA_price'][w][t]*var_aux_exc[t,w] - in_sample['DA_price'][w][t]*var_aux_def[t,w])
                                                            + (1-in_sample['Binary_var'][w][t])*(in_sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*in_sample['DA_price'][w][t]*var_aux_def[t,w])) 
-                                               for w in range(n_scen)) for t in range(n_hour))
+                                               for w in range(n_scen)) for t in range(n_hour)))
                        + beta*(var_zeta - 1/(1-0.90)*gp.quicksum((1/n_scen)*var_eta[w] for w in range(n_scen))), GRB.MAXIMIZE)
     
     #Add constraints to the model
@@ -134,11 +136,10 @@ def Offering_two_price_risk(in_sample, beta) :
         
         # Create a list to store the optimal values of the variables
         optimal_qu_off = [round(var_qu_off[t].X,2) for t in range(n_hour)]
-        # Value of the optimal objective
-        optimal_obj = model.ObjVal
         # Compute CVAR
         cvar = var_zeta.X - (1/(1-0.9))*(1/n_scen)*sum([var_eta[w].X for w in range(n_scen)])
-    
+        # Value of the optimal objective
+        optimal_obj = (model.ObjVal - beta*cvar)/(1-beta)    
     else:
         print("Optimization did not converge to an optimal solution.")
     
@@ -162,7 +163,7 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
         elif price_scheme == 2 :
             _, optimal_obj, cvar_value = Offering_two_price_risk(in_sample, beta)
         
-        expected_value.append(optimal_obj-beta*cvar_value)
+        expected_value.append(optimal_obj)
         cvar.append(cvar_value)
         
         beta += beta_step
@@ -176,9 +177,9 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
     
     return(expected_value, cvar)
     
-if __name__ == "__main__":
-    expected_value, cvar = beta_iteration(in_sample, 1, 0.5, 0.01)
-    expected_value, cvar = beta_iteration(in_sample, 2, 0.5, 0.01)
+
+expected_value, cvar = beta_iteration(in_sample, 1, 1, 0.25)
+expected_value, cvar = beta_iteration(in_sample, 2, 1, 0.25)
 
 
 

@@ -105,6 +105,6 @@ def out_of_sample_simulation (price_scheme, beta):
 
 
 
-out_of_sample_profit=out_of_sample_simulation(1, 0.5)
-
+out_of_sample_profit=out_of_sample_simulation(2, 0.5)
+print("Out of sample profit:", out_of_sample_profit)
 

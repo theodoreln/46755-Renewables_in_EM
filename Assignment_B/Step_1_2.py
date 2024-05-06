@@ -129,10 +129,8 @@ optimal_qu_off_two, optimal_obj_two = Offering_two_price(in_sample)
 """ Compute the profits for each scenarios """
 ##############################################
 
-def Profits_scenarios(in_sample, optimal_qu_off, price_scheme) :
+def Profits_scenarios(in_sample, optimal_qu_off, price_scheme, n_scen) :
     #Number of units to take into account (based on data)
-    # Number of scenarios
-    n_scen = len(in_sample)
     # Number of hour
     n_hour = 24
     
@@ -180,6 +178,8 @@ def Show_distribution(profit, nb_bins) :
     plt.show()
 
 if __name__ == "__main__":
+    # Number of scenarios
+    n_scen = len(in_sample)
     profit_one = Profits_scenarios(in_sample, optimal_qu_off_one, 1)
     profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2)
     Show_distribution(profit_one, 80)

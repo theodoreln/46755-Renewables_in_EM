@@ -180,8 +180,8 @@ def Show_distribution(profit, nb_bins) :
 if __name__ == "__main__":
     # Number of scenarios
     n_scen = len(in_sample)
-    profit_one = Profits_scenarios(in_sample, optimal_qu_off_one, 1)
-    profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2)
+    profit_one = Profits_scenarios(in_sample, optimal_qu_off_one, 1, n_scen)
+    profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2, n_scen)
     Show_distribution(profit_one, 80)
     Show_distribution(profit_two, 80)
 

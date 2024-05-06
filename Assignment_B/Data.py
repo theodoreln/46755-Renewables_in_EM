@@ -81,7 +81,7 @@ scenarios = []
 for t1 in DA_forecast:
     for t2 in DA_price:
         for t3 in PS_need:
-            scenarios.append([t1, t2, t3])
+            scenarios.append([t1.copy(), t2.copy(), t3.copy()])
 
 
 #Selecting 250 random scenarios for 'in sample' scenarios case, and creating a dataframe with them

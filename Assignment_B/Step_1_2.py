@@ -172,9 +172,9 @@ def Show_distribution(profit, nb_bins) :
     plt.hist(profit, bins=nb_bins, color='blue', edgecolor='black')
     
     # Add labels and title
-    plt.xlabel('Profit')
-    plt.ylabel('Frequency')
-    plt.title('Histogram of profits')
+    plt.xlabel('Profit [$]')
+    plt.ylabel('Number of occurence')
+    #plt.title('Histogram of profits')
     
     # Display the plot
     plt.show()

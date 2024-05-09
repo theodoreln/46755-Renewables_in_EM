@@ -11,7 +11,7 @@ import random
 import gurobipy as gp
 GRB = gp.GRB
 from Data import scenarios
-from Step_3 import Offering_one_price_risk, Offering_two_price_risk
+from Step_1_3 import Offering_one_price_risk, Offering_two_price_risk
 from Step_1_2 import Profits_scenarios, Show_distribution
 
 def Out_of_sample(in_sample, out_of_sample):

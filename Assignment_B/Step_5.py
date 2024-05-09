@@ -61,9 +61,6 @@ def Out_of_sample(in_sample, out_of_sample):
     
     return(diff_one, diff_two)
 
-
-
-
 # =========================================================================================
 # This part is for the sensitivity analysis on taking different scenarios as seen scenarios
 # =========================================================================================

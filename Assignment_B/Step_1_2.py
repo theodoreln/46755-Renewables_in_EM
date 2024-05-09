@@ -177,6 +177,46 @@ def Show_distribution(profit, nb_bins) :
     # Display the plot
     plt.show()
 
+def Iterate_Z(in_sample) :
+    # Creation of the variables
+    exp_z = [0]*251
+    decision_0 = [0]*251
+    decision_1 = [0]*251
+    decision_2 = [0]*251
+    
+    sample = in_sample.copy(deep=True)
+    
+    # We only look at hour 1
+    
+    for i in range(250) :
+        sample['Binary_var'][i][0] = 0
+    
+    for i in range(251) :
+        print(i)
+        
+        if i != 0 :
+            sample['Binary_var'][i-1][0] = 1
+            
+        optimal_qu_off_0, _ = Offering_one_price(sample, 0.9, 1.2)
+        optimal_qu_off_1, _ = Offering_one_price(sample, 0.9, 1.1)
+        optimal_qu_off_2, _ = Offering_one_price(sample, 0.9, 1.3)
+        
+        exp_z[i] = i/250
+        decision_0[i] = optimal_qu_off_0[0]
+        decision_1[i] = optimal_qu_off_1[0]
+        decision_2[i] = optimal_qu_off_2[0]
+        
+    plt.figure(figsize = (10, 7))
+    plt.rcParams["font.size"] = 12
+        
+    plt.plot(exp_z, decision_0, 'b', label="1.2 lambda")
+    plt.plot(exp_z, decision_1, 'r', label="1.1 lambda")
+    plt.plot(exp_z, decision_2, 'g', label="1.3 lambda")
+    plt.xlabel('Expected value of Z')
+    plt.ylabel('Offer decision [$/MWh]')
+    plt.legend()
+    plt.show()
+
 if __name__ == "__main__":
     # Number of scenarios
     n_scen = len(in_sample)

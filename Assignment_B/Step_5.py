@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon May  6 14:31:50 2024
-
-@author: leoni
-"""
 
 ########################
 """ Relevant modules """
@@ -21,14 +15,11 @@ from Data import scenarios
 from Step_3 import Offering_one_price_risk, Offering_two_price_risk
 from Step_1_2 import Profits_scenarios, Show_distribution
 
-#in_sample=new_in_sample3
-
 def Out_of_sample(in_sample, out_of_sample):
     
     beta=0.2
     n_out_scen=len(out_of_sample)
     n_scen=len(in_sample)
-    
     
     ######################################
     """ Out of sample simulation"""
@@ -39,8 +30,8 @@ def Out_of_sample(in_sample, out_of_sample):
     
     profit_one = Profits_scenarios(out_of_sample, optimal_qu_off_one, 1, n_out_scen)
     profit_two = Profits_scenarios(out_of_sample, optimal_qu_off_two, 2, n_out_scen)
-    Show_distribution(profit_one, 120)
-    Show_distribution(profit_two, 120)
+    #Show_distribution(profit_one, 120)
+    #Show_distribution(profit_two, 120)
         
     out_of_sample_profit_one=sum(profit_one)/n_out_scen
     out_of_sample_profit_two=sum(profit_two)/n_out_scen
@@ -54,8 +45,8 @@ def Out_of_sample(in_sample, out_of_sample):
     
     profit_one = Profits_scenarios(in_sample, optimal_qu_off_one, 1, n_scen)
     profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2, n_scen)
-    Show_distribution(profit_one, 80)
-    Show_distribution(profit_two, 80)
+    #Show_distribution(profit_one, 80)
+    #Show_distribution(profit_two, 80)
             
     in_sample_profit_one=sum(profit_one)/n_scen
     in_sample_profit_two=sum(profit_two)/n_scen
@@ -82,64 +73,31 @@ diff_samples = []
 num_samples_list=[]
 diff_one_list=[]
 diff_two_list=[]
-num_in_sample=250
+num_in_sample=180
 
+
+for i in range(1,90):
     
-random.seed(123)
-in_sample = pd.DataFrame (random.sample(scenarios,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
-remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
-out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
-    
-# diff_one, diff_two=Out_of_sample(in_sample, out_of_sample)
-# diff_samples.append(diff_one)
-# diff_samples.append(diff_two)
-
-# scenarios_2 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
-# in_sample_2 = pd.DataFrame (random.sample(scenarios_2,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
-# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_2.values.tolist()]
-# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
-    
-# diff_one, diff_two=Out_of_sample(in_sample_2, out_of_sample)
-# diff_samples.append(diff_one)
-# diff_samples.append(diff_two)  
-
-# scenarios_3 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist() or in_sample_2.values.tolist()]
-# in_sample_3 = pd.DataFrame (random.sample(scenarios_3,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
-# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_3.values.tolist()]
-# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
-    
-# diff_one, diff_two=Out_of_sample(in_sample_3, out_of_sample)
-# diff_samples.append(diff_one)
-# diff_samples.append(diff_two)  
-  
-# scenarios_4 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist() or in_sample_2.values.tolist() or in_sample_3.values.tolist()]
-# in_sample_4 = pd.DataFrame (random.sample(scenarios_4,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
-# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_4.values.tolist()]
-# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
-
-# diff_one, diff_two=Out_of_sample(in_sample_4, out_of_sample)
-# diff_samples.append(diff_one)
-# diff_samples.append(diff_two)
-
-for i in range(1,15):
     random.seed(123)
     in_sample = pd.DataFrame (random.sample(scenarios,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
     remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
     out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
+
+    # scenarios_2 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
+    # in_sample_2 = pd.DataFrame (random.sample(scenarios_2,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
+    # remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_2.values.tolist()]
+    # out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
     
     diff_one, diff_two=Out_of_sample(in_sample, out_of_sample)
+    diff_samples.append(num_in_sample)
+    diff_samples.append(diff_one)
+    diff_samples.append(diff_two)
     
-    if diff_one <= 1.5 and diff_two <= 1.5:
-
-        acceptable_samples.append(num_in_sample)
-        acceptable_samples.append(diff_one)
-        acceptable_samples.append(diff_two)
-        
     num_samples_list.append(num_in_sample)
     diff_one_list.append(diff_one)
     diff_two_list.append(diff_two)
 
-    num_in_sample += 20
+    num_in_sample += 10
 
 #print("Anzahl der In-Sample-Szenarien mit akzeptabler Abweichung:", acceptable_samples)
 plt.plot(num_samples_list, diff_one_list, label='Diff One')
@@ -189,7 +147,42 @@ plt.show()
 # Diff Two: 4.794221739418193
 
 
+    
+# random.seed(123)
+# in_sample = pd.DataFrame (random.sample(scenarios,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
+# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
+# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
+    
+# diff_one, diff_two=Out_of_sample(in_sample, out_of_sample)
+# diff_samples.append(diff_one)
+# diff_samples.append(diff_two)
 
+# scenarios_2 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist()]
+# in_sample_2 = pd.DataFrame (random.sample(scenarios_2,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
+# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_2.values.tolist()]
+# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
+    
+# diff_one, diff_two=Out_of_sample(in_sample_2, out_of_sample)
+# diff_samples.append(diff_one)
+# diff_samples.append(diff_two)  
+
+# scenarios_3 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist() or in_sample_2.values.tolist()]
+# in_sample_3 = pd.DataFrame (random.sample(scenarios_3,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
+# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_3.values.tolist()]
+# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
+    
+# diff_one, diff_two=Out_of_sample(in_sample_3, out_of_sample)
+# diff_samples.append(diff_one)
+# diff_samples.append(diff_two)  
+  
+# scenarios_4 = [scenario for scenario in scenarios if scenario not in in_sample.values.tolist() or in_sample_2.values.tolist() or in_sample_3.values.tolist()]
+# in_sample_4 = pd.DataFrame (random.sample(scenarios_4,num_in_sample), columns=['DA_forecast','DA_price','Binary_var'])
+# remaining_scenarios = [scenario for scenario in scenarios if scenario not in in_sample_4.values.tolist()]
+# out_of_sample = pd.DataFrame(remaining_scenarios, columns=['DA_forecast', 'DA_price', 'Binary_var'])
+
+# diff_one, diff_two=Out_of_sample(in_sample_4, out_of_sample)
+# diff_samples.append(diff_one)
+# diff_samples.append(diff_two)
 
 
 

@@ -69,7 +69,7 @@ optimal_qu_off_one, optimal_obj_one = Offering_one_price(in_sample)
 """ Offering strategy under a two-price scheme """
 ##################################################
 
-def Offering_two_price(in_sample) :
+def Offering_two_price(in_sample, coeff_up, coeff_down) :
     #Number of units to take into account (based on data)
     # Number of scenarios
     n_scen = len(in_sample)
@@ -91,8 +91,8 @@ def Offering_two_price(in_sample) :
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
     model.setObjective(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] 
-                                                           + in_sample['Binary_var'][w][t]*(0.9*in_sample['DA_price'][w][t]*var_aux_exc[t,w] - in_sample['DA_price'][w][t]*var_aux_def[t,w])
-                                                           + (1-in_sample['Binary_var'][w][t])*(in_sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*in_sample['DA_price'][w][t]*var_aux_def[t,w])) 
+                                                           + in_sample['Binary_var'][w][t]*(coeff_up*in_sample['DA_price'][w][t]*var_aux_exc[t,w] - in_sample['DA_price'][w][t]*var_aux_def[t,w])
+                                                           + (1-in_sample['Binary_var'][w][t])*(in_sample['DA_price'][w][t]*var_aux_exc[t,w] -coeff_down*in_sample['DA_price'][w][t]*var_aux_def[t,w])) 
                                                for w in range(n_scen)) for t in range(n_hour)), GRB.MAXIMIZE)
     
     #Add constraints to the model
@@ -123,7 +123,7 @@ def Offering_two_price(in_sample) :
     
     return(optimal_qu_off, optimal_obj)
 
-optimal_qu_off_two, optimal_obj_two = Offering_two_price(in_sample)
+optimal_qu_off_two, optimal_obj_two = Offering_two_price(in_sample, 0.9, 1.2)
 
 
 ##############################################
@@ -185,7 +185,68 @@ if __name__ == "__main__":
     profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2, n_scen)
     Show_distribution(profit_one, 80)
     Show_distribution(profit_two, 80)
+    range_one = np.max(profit_one) - np.min(profit_one)
+    range_two = np.max(profit_two) - np.min(profit_two)
+    avg_one = np.mean(profit_one)
+    avg_two = np.mean(profit_two)
+    std_one = np.std(profit_one)
+    std_two = np.std(profit_two)
 
+
+##################################################
+""" Variant to understand the two-price scheme """
+##################################################
+
+optimal_qu_off_two_var, optimal_obj_two = Offering_two_price(in_sample, 0.9, 1.1)
+
+power_avg = [0]*24
+binary = [0]*24
+for i in range(250) :
+    for j in range(24) :
+        power_avg[j] += in_sample['DA_forecast'][i][j]
+        binary[j] += in_sample['Binary_var'][i][j]
+for j in range(24) :
+    power_avg[j] = power_avg[j]/250
+    binary[j] = binary[j]/250
+    if binary[j] > 0.5 :
+        binary[j] = 1 
+    else :
+        binary[j] = 0
+    
+Hours = [x for x in range(1,25)]
+
+binary=np.array(binary)
+
+# Create custom colormap based on background_colors
+cmap = plt.cm.gray  # Use grayscale colormap
+norm = plt.Normalize(binary.min(), binary.max())
+colors = cmap(norm(binary))
+
+# Create figure and axes
+fig, ax = plt.subplots(figsize = (10, 7))
+
+# Plot data with colored background
+for i in range(1,25) :
+    if binary[i-1] == 0:
+        color = 'white'
+    elif binary[i-1] == 1:
+        color = '#D3D3D3'  # Light grey color
+    ax.axvspan(i, i+1, color=color)
+    
+ax.step(Hours, optimal_qu_off_two, 'b', label='1.2 lambda', where='post')
+ax.step(Hours, optimal_qu_off_two_var, 'g', label='1.1 lambda', where='post')
+ax.step(Hours, power_avg, 'r--', label='Average power forecast', alpha=0.8, where='post')
+
+# Customize plot
+ax.legend()
+# Set x-axis limits
+ax.set_xlim(1, 24)
+ax.set_xlabel('Hours')
+ax.set_ylabel('Power [MW]')
+# ax.grid(True)  # Optionally, add gridlines
+
+# Show plot
+plt.show()
 
 
 

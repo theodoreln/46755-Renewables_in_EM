@@ -17,10 +17,10 @@ from Data import in_sample
 """ Offering strategy under a one-price scheme """
 ##################################################
 
-def Offering_one_price_risk(in_sample, beta) :
+def Offering_one_price_risk(sample, beta) :
     #Number of units to take into account (based on data)
     # Number of scenarios
-    n_scen = len(in_sample)
+    n_scen = len(sample)
     # Number of hour
     n_hour = 24
     
@@ -37,8 +37,8 @@ def Offering_one_price_risk(in_sample, beta) :
     var_eta = model.addVars(n_scen, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='eta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
-    model.setObjective((1-beta)*(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] + in_sample['Binary_var'][w][t]*0.9*in_sample['DA_price'][w][t]*var_qu_diff[t,w]
-                                                           + (1-in_sample['Binary_var'][w][t])*1.2*in_sample['DA_price'][w][t]*var_qu_diff[t,w]) for w in range(n_scen)) for t in range(n_hour)))
+    model.setObjective((1-beta)*(gp.quicksum(gp.quicksum((1/n_scen)*(sample['DA_price'][w][t]*var_qu_off[t] + sample['Binary_var'][w][t]*0.9*sample['DA_price'][w][t]*var_qu_diff[t,w]
+                                                           + (1-sample['Binary_var'][w][t])*1.2*sample['DA_price'][w][t]*var_qu_diff[t,w]) for w in range(n_scen)) for t in range(n_hour)))
                        + beta*(var_zeta - 1/(1-0.90)*gp.quicksum((1/n_scen)*var_eta[w] for w in range(n_scen))), GRB.MAXIMIZE)
     
     #Add constraints to the model
@@ -48,13 +48,13 @@ def Offering_one_price_risk(in_sample, beta) :
         model.addConstr(var_qu_off[t] >= 0)
         # Definition of the difference quantity variable
         for w in range(n_scen):
-            model.addConstr(var_qu_diff[t,w] == in_sample['DA_forecast'][w][t] - var_qu_off[t])
+            model.addConstr(var_qu_diff[t,w] == sample['DA_forecast'][w][t] - var_qu_off[t])
             
     # Constraints for the risk selection 
     for w in range(n_scen):
         model.addConstr(var_eta[w] >= 0)
-        model.addConstr(- gp.quicksum(in_sample['DA_price'][w][t]*var_qu_off[t] + in_sample['Binary_var'][w][t]*0.9*in_sample['DA_price'][w][t]*var_qu_diff[t,w]
-                                      + (1-in_sample['Binary_var'][w][t])*1.2*in_sample['DA_price'][w][t]*var_qu_diff[t,w] for t in range(n_hour)) + var_zeta - var_eta[w] <= 0)
+        model.addConstr(- gp.quicksum(sample['DA_price'][w][t]*var_qu_off[t] + sample['Binary_var'][w][t]*0.9*sample['DA_price'][w][t]*var_qu_diff[t,w]
+                                      + (1-sample['Binary_var'][w][t])*1.2*sample['DA_price'][w][t]*var_qu_diff[t,w] for t in range(n_hour)) + var_zeta - var_eta[w] <= 0)
     
     #Solve the problem
     model.optimize()
@@ -80,10 +80,10 @@ def Offering_one_price_risk(in_sample, beta) :
 """ Offering strategy under a two-price scheme """
 ##################################################
 
-def Offering_two_price_risk(in_sample, beta) :
+def Offering_two_price_risk(sample, beta) :
     #Number of units to take into account (based on data)
     # Number of scenarios
-    n_scen = len(in_sample)
+    n_scen = len(sample)
     # Number of hour
     n_hour = 24
     
@@ -104,9 +104,9 @@ def Offering_two_price_risk(in_sample, beta) :
     var_eta = model.addVars(n_scen, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, vtype=GRB.CONTINUOUS, name='eta')
     
     # Add the objective function to the model, sum on every t, separation of the conventional generation units and the wind farms
-    model.setObjective((1-beta)*(gp.quicksum(gp.quicksum((1/n_scen)*(in_sample['DA_price'][w][t]*var_qu_off[t] 
-                                                           + in_sample['Binary_var'][w][t]*(0.9*in_sample['DA_price'][w][t]*var_aux_exc[t,w] - in_sample['DA_price'][w][t]*var_aux_def[t,w])
-                                                           + (1-in_sample['Binary_var'][w][t])*(in_sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*in_sample['DA_price'][w][t]*var_aux_def[t,w])) 
+    model.setObjective((1-beta)*(gp.quicksum(gp.quicksum((1/n_scen)*(sample['DA_price'][w][t]*var_qu_off[t] 
+                                                           + sample['Binary_var'][w][t]*(0.9*sample['DA_price'][w][t]*var_aux_exc[t,w] - sample['DA_price'][w][t]*var_aux_def[t,w])
+                                                           + (1-sample['Binary_var'][w][t])*(sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*sample['DA_price'][w][t]*var_aux_def[t,w])) 
                                                for w in range(n_scen)) for t in range(n_hour)))
                        + beta*(var_zeta - 1/(1-0.90)*gp.quicksum((1/n_scen)*var_eta[w] for w in range(n_scen))), GRB.MAXIMIZE)
     
@@ -117,7 +117,7 @@ def Offering_two_price_risk(in_sample, beta) :
         model.addConstr(var_qu_off[t] >= 0)
         # Definition of the difference quantity variable
         for w in range(n_scen):
-            model.addConstr(var_qu_diff[t,w] == in_sample['DA_forecast'][w][t] - var_qu_off[t])
+            model.addConstr(var_qu_diff[t,w] == sample['DA_forecast'][w][t] - var_qu_off[t])
             model.addConstr(var_qu_diff[t,w] == var_aux_exc[t,w] - var_aux_def[t,w])
             model.addConstr(var_aux_exc[t,w] >= 0)
             model.addConstr(var_aux_def[t,w] >= 0)
@@ -125,8 +125,8 @@ def Offering_two_price_risk(in_sample, beta) :
     # Constraints for the risk selection 
     for w in range(n_scen):
         model.addConstr(var_eta[w] >= 0)
-        model.addConstr(- gp.quicksum(in_sample['DA_price'][w][t]*var_qu_off[t] + in_sample['Binary_var'][w][t]*(0.9*in_sample['DA_price'][w][t]*var_aux_exc[t,w] - in_sample['DA_price'][w][t]*var_aux_def[t,w])
-                                      + (1-in_sample['Binary_var'][w][t])*(in_sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*in_sample['DA_price'][w][t]*var_aux_def[t,w]) for t in range(n_hour)) + var_zeta - var_eta[w] <= 0)
+        model.addConstr(- gp.quicksum(sample['DA_price'][w][t]*var_qu_off[t] + sample['Binary_var'][w][t]*(0.9*sample['DA_price'][w][t]*var_aux_exc[t,w] - sample['DA_price'][w][t]*var_aux_def[t,w])
+                                      + (1-sample['Binary_var'][w][t])*(sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*sample['DA_price'][w][t]*var_aux_def[t,w]) for t in range(n_hour)) + var_zeta - var_eta[w] <= 0)
     
     #Solve the problem
     model.optimize()
@@ -151,7 +151,7 @@ def Offering_two_price_risk(in_sample, beta) :
 """ Iterating on the value of beta """
 ######################################
 
-def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
+def beta_iteration(sample, price_scheme, beta_max, beta_step) :
     # Initialize the lists
     expected_value = []
     cvar = []
@@ -161,9 +161,9 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
     while beta < beta_max :
         # Condition on which price_scheme
         if price_scheme == 1 :
-            _, optimal_obj, cvar_value = Offering_one_price_risk(in_sample, beta)
+            _, optimal_obj, cvar_value = Offering_one_price_risk(sample, beta)
         elif price_scheme == 2 :
-            _, optimal_obj, cvar_value = Offering_two_price_risk(in_sample, beta)
+            _, optimal_obj, cvar_value = Offering_two_price_risk(sample, beta)
         
         expected_value.append(optimal_obj)
         cvar.append(cvar_value)

@@ -9,6 +9,7 @@ import pandas as pd
 import copy
 import random
 import gurobipy as gp
+import os
 GRB = gp.GRB
 from Data import in_sample
 
@@ -224,6 +225,8 @@ if __name__ == "__main__":
     profit_two = Profits_scenarios(in_sample, optimal_qu_off_two, 2, n_scen)
     Show_distribution(profit_one, 80)
     Show_distribution(profit_two, 80)
+
+    #Iterate_Z(in_sample)
 
 
 

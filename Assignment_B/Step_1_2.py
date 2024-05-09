@@ -177,6 +177,10 @@ def Show_distribution(profit, nb_bins) :
     
     # Display the plot
     plt.show()
+    
+######################################################
+""" Function to iterate on the value of expected Z """
+######################################################
 
 def Iterate_Z(in_sample) :
     # Creation of the variables

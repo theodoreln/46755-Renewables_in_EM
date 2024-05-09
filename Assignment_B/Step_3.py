@@ -139,7 +139,8 @@ def Offering_two_price_risk(in_sample, beta) :
         # Compute CVAR
         cvar = var_zeta.X - (1/(1-0.9))*(1/n_scen)*sum([var_eta[w].X for w in range(n_scen)])
         # Value of the optimal objective
-        optimal_obj = (model.ObjVal - beta*cvar)/(1-beta)    
+        optimal_obj = (model.ObjVal - beta*cvar)/(1-beta)   
+
     else:
         print("Optimization did not converge to an optimal solution.")
     
@@ -154,8 +155,9 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
     # Initialize the lists
     expected_value = []
     cvar = []
+    labels = []
     beta = 0
-    
+    count = 0
     while beta < beta_max :
         # Condition on which price_scheme
         if price_scheme == 1 :
@@ -165,21 +167,43 @@ def beta_iteration(in_sample, price_scheme, beta_max, beta_step) :
         
         expected_value.append(optimal_obj)
         cvar.append(cvar_value)
-        
+        labels.append(round(beta,2))
         beta += beta_step
     
-    plt.scatter(cvar, expected_value)
+    
+    first_label_position = (cvar[0], expected_value[0])  # First label
+    middle_label_position = (cvar[len(cvar)//2], expected_value[len(expected_value)//2])  # Middle label
+    last_label_position = (cvar[-1], expected_value[-1])  # Last label  
+    plt.scatter(cvar, expected_value, color='red', marker='o', edgecolors='black', label='Data Points', zorder=2)
+
+    # Add labels to the dots with beta symbol
+    plt.annotate(f'β = {labels[0]}', first_label_position, fontsize=8, ha='right', color='black', xytext=(6, -12), textcoords='offset points')
+    plt.annotate(f'β = {labels[len(cvar)//2]}', middle_label_position, fontsize=8, ha='right', color='black', xytext=(-6, 0), textcoords='offset points')
+    plt.annotate(f'β = {labels[-1]}', last_label_position, fontsize=8, ha='right', color='black', xytext=(-10, -4), textcoords='offset points')
+    
     # Add labels and title
-    plt.xlabel('CVAR ($)')
+    plt.xlabel('CVaR ($)')
     plt.ylabel('Expected Profit ($)')
-    plt.title('Expected Profit function of CVAR')
+
+    # Connect the dots with a dashed red line
+    plt.plot(cvar, expected_value, color='red', linestyle=':', linewidth=0.8, label='Trend Line', zorder=1)
+
+    # Add gridlines
+    plt.grid(True, color='#D9E6FF')
+
+    # Customize font style
+    plt.rcParams.update({'font.family': 'Arial', 'font.size': 10})
+
+    # Change background color to a lighter shade of blue
+    plt.gca().set_facecolor('white')  # Lighter shade of blue
+
     plt.show()
     
     return(expected_value, cvar)
     
-
-expected_value, cvar = beta_iteration(in_sample, 1, 1, 0.25)
-expected_value, cvar = beta_iteration(in_sample, 2, 1, 0.25)
+if __name__ == "__main__":
+    expected_value, cvar = beta_iteration(in_sample, 1, 1, 0.05)
+    expected_value, cvar = beta_iteration(in_sample, 2, 1, 0.05)
 
 
 

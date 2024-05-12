@@ -17,7 +17,7 @@ from Data import in_sample
 """ Offering strategy under a one-price scheme """
 ##################################################
 
-def Offering_two_zeta(in_sample, coeff_1, coeff_2) :
+def Offering_one_price(in_sample, coeff_1, coeff_2) :
     #Number of units to take into account (based on data)
     # Number of scenarios
     n_scen = len(in_sample)
@@ -87,9 +87,9 @@ def Iterate_Z(in_sample) :
         if i != 0 :
             sample['Binary_var'][i-1][0] = 1
             
-        optimal_qu_off_0, _ = Offering_two_zeta(sample, 0.9, 1.2)
-        optimal_qu_off_1, _ = Offering_two_zeta(sample, 0.9, 1.1)
-        optimal_qu_off_2, _ = Offering_two_zeta(sample, 0.9, 1.3)
+        optimal_qu_off_0, _ = Offering_one_price(sample, 0.9, 1.2)
+        optimal_qu_off_1, _ = Offering_one_price(sample, 0.9, 1.1)
+        optimal_qu_off_2, _ = Offering_one_price(sample, 0.9, 1.3)
         
         exp_z[i] = i/250
         decision_0[i] = optimal_qu_off_0[0]

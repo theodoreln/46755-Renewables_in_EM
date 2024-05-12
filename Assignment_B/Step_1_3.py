@@ -56,6 +56,10 @@ def Offering_one_price_risk(sample, beta) :
         model.addConstr(- gp.quicksum(sample['DA_price'][w][t]*var_qu_off[t] + sample['Binary_var'][w][t]*0.9*sample['DA_price'][w][t]*var_qu_diff[t,w]
                                       + (1-sample['Binary_var'][w][t])*1.2*sample['DA_price'][w][t]*var_qu_diff[t,w] for t in range(n_hour)) + var_zeta - var_eta[w] <= 0)
     
+    
+    # Set Gurobi parameter to suppress output
+    model.setParam('OutputFlag', 0)
+    
     #Solve the problem
     model.optimize()
     
@@ -127,6 +131,10 @@ def Offering_two_price_risk(sample, beta) :
         model.addConstr(var_eta[w] >= 0)
         model.addConstr(- gp.quicksum(sample['DA_price'][w][t]*var_qu_off[t] + sample['Binary_var'][w][t]*(0.9*sample['DA_price'][w][t]*var_aux_exc[t,w] - sample['DA_price'][w][t]*var_aux_def[t,w])
                                       + (1-sample['Binary_var'][w][t])*(sample['DA_price'][w][t]*var_aux_exc[t,w] -1.2*sample['DA_price'][w][t]*var_aux_def[t,w]) for t in range(n_hour)) + var_zeta - var_eta[w] <= 0)
+    
+    
+    # Set Gurobi parameter to suppress output
+    model.setParam('OutputFlag', 0)
     
     #Solve the problem
     model.optimize()

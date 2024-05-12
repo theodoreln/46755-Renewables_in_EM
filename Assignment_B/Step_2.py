@@ -151,10 +151,10 @@ def P90_verify(optimal_qu_off, out_of_sample, epsilon) :
     total_pos = epsilon*n_scen*n_min
     if def_count > total_pos :
         decision = 0
-        print(f"P90 rule is not fullfilled for {optimal_qu_off} kW offered")
+        # print(f"P90 rule is not fullfilled for {optimal_qu_off} kW offered")
     else :
         decision = 1
-        print(f"P90 is fullfilled for {optimal_qu_off} kW offered")
+        # print(f"P90 is fullfilled for {optimal_qu_off} kW offered")
     
     return(shortage, def_count, decision)
     
@@ -219,7 +219,7 @@ def Shortage_plot(in_sample, out_of_sample, epsilon) :
     # plt.fill_between(minutes, avg_short_in_CVAR - sd_in_CVAR, avg_short_in_CVAR + sd_in_CVAR, color='darkorange', alpha=0.2)
     # plt.fill_between(minutes, avg_short_out_CVAR - sd_out_CVAR, avg_short_out_CVAR + sd_out_CVAR, color='red', alpha=0.2)
     plt.xlabel('Minute in Hour')
-    plt.ylabel('Average power shortage [MW]')
+    plt.ylabel('Average power shortage [kW]')
     plt.legend(loc=1)
     plt.show()
     
@@ -319,13 +319,69 @@ def Plotting_CFD(sample, qu_off) :
 """ Plotting the effect of epsilon choosing on the missing kWh """
 ##################################################################
 
-def Effect_epsilon(in_sample, out_of_sample) :
+def Effect_epsilon(sto_anc_scenarios) :
+    # Let's cancel the seed to be able to have something really random
+    random.seed(None)
+    
+    # We are going to iterate on multiple selection of random in sample to reduce the influence of scenarios selection
+    n_sel = 30
+    
     # List of values for data generation
     epsilon_values = np.arange(0, 0.6, 0.05)
-    Qu_off = np.zeros(len(epsilon_values))
+    Qu_off = np.zeros((n_sel,len(epsilon_values)))
+    Lost_table = np.zeros((n_sel,150,len(epsilon_values)))
     
+    for sel in range(n_sel) :
+        print(sel)
+        # Selecting scenarios
+        in_sample = random.sample(sto_anc_scenarios,50)
+        out_of_sample = [scenario for scenario in sto_anc_scenarios if scenario not in in_sample]
+        
+        # Compute the shortage values
+        for i in range(len(epsilon_values)) :
+            eps = epsilon_values[i]
+            Qu_off[sel,i] = P90_ALSO_X(in_sample, eps)
+            shortage, def_count, decision = P90_verify(Qu_off[sel,i], out_of_sample, eps)
+            shortage_array = np.array(shortage)
+            shortage_sum = np.sum(shortage_array, axis=1)
+            shortage_kWh = shortage_sum * (1/60)
+            Lost_table[sel,:,i] = shortage_kWh
+        
+    # Compute mean values and standard deviation
+    Mean_lost = np.mean(Lost_table, axis=(0,1))
+    SD_lost = np.std(Lost_table, axis=(0,1))
+    Q10_lost = np.percentile(Lost_table, 10, axis=(0,1))
+    Q90_lost = np.percentile(Lost_table, 90, axis=(0,1))
+    Mean_qu = np.mean(Qu_off, axis=0)
+    Q10_qu = np.percentile(Qu_off, 10, axis=0)
+    Q90_qu = np.percentile(Qu_off, 90, axis=0)
+    SD_qu = np.std(Qu_off, axis=0)
     
-    # 
+    # Plotting of lines of average reserve shortfall
+    plt.figure(figsize = (10, 7))
+    plt.rcParams["font.size"] = 12
+    plt.plot(epsilon_values, Mean_lost, label='Average reserve shorfall')
+    plt.fill_between(epsilon_values, Q10_lost, Q90_lost, label='Quantiles 10% and 90% of the reserve shortfall', alpha=0.2)
+    plt.legend(loc=2)
+    plt.xlabel('Epsilon')
+    plt.ylabel('Expected reserve shortfall [kWh]')
+    plt.show()
+    
+    # Plotting of lines of optimal reserve bid
+    plt.figure(figsize = (10, 7))
+    plt.rcParams["font.size"] = 12
+    plt.plot(epsilon_values, Mean_qu, label='Average optimal reserve bid')
+    plt.fill_between(epsilon_values, Q10_qu, Q90_qu,label='Quantiles 10% and 90% of the optimal reserve bid', alpha=0.2)
+    plt.legend(loc=2)
+    plt.xlabel('Epsilon')
+    plt.ylabel('Power bid [kW]')
+    plt.show()
+    
+    # Take out the standard deviations
+    print(f"Standard deviation lost {SD_lost}")
+    print(f"Standard deviation qu {SD_qu}")
+    
+Effect_epsilon(sto_anc_scenarios)
 
 
 ##########################################################################
@@ -333,32 +389,45 @@ def Effect_epsilon(in_sample, out_of_sample) :
 ##########################################################################
 
 def Heat_map(sto_anc_scenarios) :
+    # Let's cancel the seed to be able to have something really random
+    random.seed(None)
+    
+    # We are going to iterate on multiple selection of random in sample to reduce the influence of scenarios selection
+    n_sel = 20
+    
     #Generate the data for the heat map
     # Lists for data generation
     sample_values = np.arange(10, 210, 20)
     epsilon_values = np.arange(0, 0.6, 0.1)
     
     # Table with values of offered quantity
-    Off_qu = np.zeros((len(epsilon_values), len(sample_values)))
+    Off_qu = np.zeros((n_sel, len(epsilon_values), len(sample_values)))
     # Table with the values of verification
-    Verif = np.zeros((len(epsilon_values), len(sample_values)))
-    Numb_shortage = np.zeros((len(epsilon_values), len(sample_values)))
+    Verif = np.zeros((n_sel, len(epsilon_values), len(sample_values)))
+    Numb_shortage = np.zeros((n_sel, len(epsilon_values), len(sample_values)))
     
-    # Get the data for the plotting
-    for i in range(len(sample_values)):
-        for j in range(len(epsilon_values)) :
-            print(f"\n Sample : {sample_values[i]} and Epsilon : {epsilon_values[j]}")
-            sample = sample_values[i]
-            epsilon = epsilon_values[j]
-            # Selecting scenarios
-            in_sample = random.sample(sto_anc_scenarios,sample)
-            out_of_sample = [scenario for scenario in sto_anc_scenarios if scenario not in in_sample]
-            # Computing the offered value
-            Off_qu[j,i] = P90_ALSO_X(in_sample, epsilon)
-            # Verifying Energinet rule
-            _, Numb_shortage[j,i], Verif[j,i] = P90_verify(Off_qu[j,i], out_of_sample, epsilon)
-            Numb_shortage[j,i] = Numb_shortage[j,i]/len(out_of_sample)
+    for sel in range(n_sel) :
+        print(sel)
+        # Get the data for the plotting
+        for i in range(len(sample_values)):
+            for j in range(len(epsilon_values)) :
+                print(f"\n Sample : {sample_values[i]} and Epsilon : {epsilon_values[j]}")
+                sample = sample_values[i]
+                epsilon = epsilon_values[j]
+                # Selecting scenarios
+                in_sample = random.sample(sto_anc_scenarios,sample)
+                out_of_sample = [scenario for scenario in sto_anc_scenarios if scenario not in in_sample]
+                # Computing the offered value
+                Off_qu[sel,j,i] = P90_ALSO_X(in_sample, epsilon)
+                # Verifying Energinet rule
+                _, Numb_shortage[sel,j,i], Verif[sel,j,i] = P90_verify(Off_qu[sel,j,i], out_of_sample, epsilon)
+                Numb_shortage[sel,j,i] = Numb_shortage[sel,j,i]/len(out_of_sample)
             
+    # Computing the average of the values
+    Avg_Off_qu = np.round(np.mean(Off_qu, axis=0), decimals=2)
+    Avg_Numb_shortage = np.mean(Numb_shortage, axis=0)
+    Avg_Verif = np.mean(Verif, axis=0)
+    Avg_Verif_round = np.round(Avg_Verif)
     
     #Plotting the thing
     
@@ -370,19 +439,20 @@ def Heat_map(sto_anc_scenarios) :
     plt.rcParams["font.size"] = 12
     
     # With percentage of shortage
-    plt.pcolormesh(x, y, Numb_shortage, cmap='viridis', shading='auto')
+    plt.pcolormesh(x, y, Avg_Numb_shortage, cmap='viridis', shading='auto')
     # Add color scale on the right side
     plt.colorbar(label='Percentage of power shortage [%]')
     # Add text annotations to each square
     for i in range(len(sample_values)):
         for j in range(len(epsilon_values)):
-            plt.text(sample_values[i], epsilon_values[j], f'{Off_qu[j,i]}',
-                     ha='center', va='center', color='black', fontsize=10)
+            plt.text(sample_values[i], epsilon_values[j], f'{Avg_Off_qu[j,i]}',
+                     ha='center', va='center', color='white', fontsize=10)
     plt.xlabel('Number of in sample scenarios selected')
     plt.ylabel('Epsilon')
     # Remove horizontal grid lines
     plt.grid(axis='y', linestyle='')
     plt.show()
+    
     
     #Plotting the thing
     # Define colors for binary values (0: red, 1: green)
@@ -393,26 +463,26 @@ def Heat_map(sto_anc_scenarios) :
     x, y = np.meshgrid(sample_values, epsilon_values)
     
     # Plot the grid with colors representing the binary values of the third property
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(10, 6))
     plt.rcParams["font.size"] = 12
     
     # With if it respect or not
-    plt.pcolormesh(x, y, Verif, cmap=cmap, shading='auto')
+    plt.pcolormesh(x, y, Avg_Verif_round, cmap=cmap, shading='auto')
     # Add text annotations to each square
     for i in range(len(sample_values)):
         for j in range(len(epsilon_values)):
-            plt.text(sample_values[i], epsilon_values[j], f'{Off_qu[j,i]}',
-                     ha='center', va='center', color='black', fontsize=10)
+            plt.text(sample_values[i], epsilon_values[j], f'{Avg_Off_qu[j,i]}',
+                     ha='center', va='center', color='white', fontsize=10)
     plt.xlabel('Number of in sample scenarios selected')
     plt.ylabel('Epsilon')
     # Remove horizontal grid lines
     plt.grid(axis='y', linestyle='')
     plt.show()
     
-    return(Off_qu, Verif)
+    return(Avg_Off_qu, Avg_Numb_shortage, Avg_Verif_round)
 
-# random.seed(456)
-# Off_qu, Verif = Heat_map(sto_anc_scenarios)
+
+# Avg_Off_qu, Avg_Numb_shortage, Avg_Verif_round = Heat_map(sto_anc_scenarios)
 
 
 

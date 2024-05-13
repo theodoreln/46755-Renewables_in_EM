@@ -102,7 +102,7 @@ def P90_CVAR(in_sample,epsilon) :
     model.addConstr((1/(n_scen*n_min))*gp.quicksum(gp.quicksum(var_zeta[s,m] for m in range(n_min)) for s in range(n_scen)) <= (1-epsilon)*var_beta)
     
     # Set Gurobi parameter to suppress output
-    model.setParam('OutputFlag', 0)
+    # model.setParam('OutputFlag', 0)
     
     #Solve the problem
     model.optimize()
@@ -262,7 +262,7 @@ def Shortage_plot(in_sample, out_of_sample, epsilon) :
     plt.show()
     
 
-Shortage_plot(sto_anc_in_sample, sto_anc_out_of_sample, 0.1)
+# Shortage_plot(sto_anc_in_sample, sto_anc_out_of_sample, 0.1)
 
 
 ###########################################################
@@ -381,7 +381,7 @@ def Effect_epsilon(sto_anc_scenarios) :
     print(f"Standard deviation lost {SD_lost}")
     print(f"Standard deviation qu {SD_qu}")
     
-Effect_epsilon(sto_anc_scenarios)
+# Effect_epsilon(sto_anc_scenarios)
 
 
 ##########################################################################
